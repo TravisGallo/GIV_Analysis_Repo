@@ -32,7 +32,7 @@ pop40 <- (covs[,"CMAP_pop40_dens"] - mean(covs[,"CMAP_pop40_dens"]))/sd(covs[,"C
 
 # observation covariate - season
 # vector indicating which calander season the observation was obtained
-season <- c(3,4,1,2,3,4,1,2,3,4,1)
+# season <- c(2,3,4,1,2,3,4,1,2,3,4,1,2)
 
 # resistance covariates
 # NDVI resistence layer: 1-NDVI = resistance (scaled)
@@ -46,34 +46,30 @@ interstate_res <- raster("./Data/Interstate_Resistance.tif")
 # patch indicator indicating that habitat patches have 0 resistance
 patch_indicator <- raster("./Data/2018-03-20_patch_indicator_raster.tif")
 
-###################################################
-###################################################
+# observation and sampling data
+full_site_names <- read.table("./Data/sites_used_in_sp10_sp13_analysis_6_1_17.txt", header = TRUE)
+full_site_names[!full_site_names[,1] %in% covs$Station.ID,] # see the mismatch
+# randomly chose 1 site for patches that had multiple sites. Remove unused sites
+sites_names <- as.character(full_site_names[-c(23,70,69,95,96),])
 
-#presence-absence data
-y1<-read.csv("y.wide.dryad.csv")
-y.pre1<-data.matrix(y1[,2:45], 47)
-y.pre<-array(y.pre1, dim=c(47, 3, 15))
-
-#elevation
-dem.900mag <- raster("dem")
-dem.900mag.scale <- scale(dem.900mag) 
+# load species specific data - remove sites that we do not use in this analysis
+z_array <- df_2_array(read.table("./Data/z_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(23,70,69,95,96),-c(1,2)]
+# build y-array and j-matrix
+y_array <- df_2_array(read.table("./Data/y_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(23,70,69,95,96),-c(1,2)]
+j_mat <- read.table("./Data/j_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t")[-c(23,70,69,95,96),-c(1,2)]
 
 #Take a look at the raw data
+sum(y_array, na.rm=TRUE) # Total dets
+colSums(y_array, na.rm=TRUE) # Dets per season
+sum(rowSums(y_array, na.rm = TRUE) > 0)/nrow(y_array) # Proportion of sites occupied
 
-sum(y.pre, na.rm=TRUE)                            # Total dets
-apply(y.pre, 3, sum, na.rm=TRUE)                  # Dets per year
-colSums(apply(y.pre, c(1,3), sum, na.rm=TRUE)>0)  # Sites occupied
+
+###################################################
+###################################################
+
+
 
 nSampled <- nrow(y.pre)
-
-devAskNewPage(TRUE)
-for(t in 1:dim(y.pre)[3]) {
-    dets.t <- which(rowSums(y.pre[,,t], na.rm=TRUE)>0)
-    plot(dem.900mag.scale, main=paste("Year", (2003:2017)[t], "with", length(dets.t), "sites occupied"))
-    points(coords, pch=3)
-    points(coords[1:nSampled,], pch=16)
-    points(coords[dets.t,], pch=16, col=rgb(0,0,1,0.9))
-}
 
 
 #Code to run sampler with data for 10 MCMC iterations

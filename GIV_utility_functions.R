@@ -22,6 +22,15 @@ packs <- c("dplyr", "reshape2", "runjags", "mcmcplots",
 
 package_load(packs)
 
+# change dataframes back to an array
+df_2_array <- function(my_df = NULL){
+  
+  require(reshape2)
+  my_array <- acast(my_df, species~site~season, value.var = "count")
+  dimnames(my_array) <- NULL
+  return(my_array)
+}
+
 # function to intersect background data layer (vector) with buffer layers (vector) and calculate needed data
 # layer 1 should be the input layer with data to extract, layer 2 is the intersecting layer
 getIntersect <- function(layer1, layer2, columnName, getMean=FALSE, getLength=FALSE, getArea=FALSE, n.cores){

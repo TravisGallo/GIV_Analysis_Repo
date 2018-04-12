@@ -200,7 +200,7 @@ s_pop_500$density <- s_pop_500$dat/max(m_buffer_clip$AREA)
 
 # projected housing units
 # CMAP population data -  CMAP GoTo2040
-CMAP_pop <- readOGR(dsn="./Data", layer="CMAP_2040_Forecast_26916") # CMAP projected forecast at subzone level (~800m resolution)
+CMAP_pop <- readOGR(dsn=path.expand("./Data"), layer="CMAP_2040_Forecast_26916") # CMAP projected forecast at subzone level (~800m resolution)
 m_PHH10_500 <- getIntersect(CMAP_pop, m_buffer, "PHH10", n.cores=6) # 2010 population in households
 m_PHH40_500 <- getIntersect(CMAP_pop, m_buffer, "PHH40", n.cores=6) # projected population in households
 s_PHH10_500 <- getIntersect(CMAP_pop, s_buffer, "PHH10", n.cores=6) # 2010 population in households
@@ -341,13 +341,13 @@ pop10_raster <- fasterize(CMAP_pop_sf, ndvi_res, field = "PHH10", fun="min")
 pop40_raster <- fasterize(CMAP_pop_sf, ndvi_res, field = "PHH40", fun="min")
 
 # plot
-plot(pop40_raster)
+plot(pop10_raster)
 
 # write to explore in QGIS
 writeRaster(pop10_raster, "CMAP_PHH10", format = "GTiff")
 writeRaster(pop40_raster, "CMAP_PHH40", format = "GTiff")
 
-save.image("2018-03-27_GIV_Workspace.RData")
+save.image("2018-04-12_GIV_Workspace.RData")
 
 ######## HARD HAT AREA - PROCEED WITH CAUTION ###############
 
