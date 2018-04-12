@@ -63,6 +63,8 @@ sum(y_array, na.rm=TRUE) # Total dets
 colSums(y_array, na.rm=TRUE) # Dets per season
 sum(rowSums(y_array, na.rm = TRUE) > 0)/nrow(y_array) # Proportion of sites occupied
 
+# STILL NEED TO CHANGE SITE NAMES THAT END IN 0 BACK TO 1 OR VISE VERSA SO THE PATCH INFO MATCHES THE SAMPLING DATA
+# PATCH DATA IS CURRENLTY NOT IN THE SAME ORDER AS SAMPLING DATA
 
 ###################################################
 ###################################################
