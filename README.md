@@ -1,5 +1,5 @@
 # GIV_Analysis_Repo
-Repo for version control across UWI GIV analysis/project
+A working repo for version control across the Urban Wildlife Institute's GIV analysis/project
 
 # File Description
 **2018_03_27_giv_data_compile.R** - R script that calcualtes spatial site-level data for each patch
