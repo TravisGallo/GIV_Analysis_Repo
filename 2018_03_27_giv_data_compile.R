@@ -273,7 +273,7 @@ m_patches$TYPE <- 0
                   m_patches$CATEGORY == "Parks and Recreation" |
                   m_patches$CATEGORY == "County Park" |
                   m_patches$LANDUSE == 3100), "TYPE"]
-# golf Course = 2
+# golf course = 2
 2 -> m_patches[which(m_patches$CATEGORY == "Golf Course" | m_patches$LANDUSE == 3200), "TYPE"]
 
 # cemeteries = 3

@@ -9,31 +9,50 @@
 source("GIV_utility_functions.R")
 
 #load covariate data
-covs <- readRDS("./Data/patch_covariates.RDS")
+covs <- readRDS("./Data/2018-03-27_patch_covariates.RDS")
 
 #site coordinates
 coords <- as.matrix(covs[, c("x","y")])
 
-##########################################
-##########################################
+# site-level covariates
+# site type: 1 = park; 2 = golf course; 3 = cemetery' 4 = natural area/conservation
+type <- covs[,"site_type"]
+# tree cover (scaled)
+tree <- (covs[,"patch_tree"] - mean(covs[,"patch_tree"]))/sd(covs[,"patch_tree"])
+# vegetation cover (scaled)
+total_veg <- (covs[,"patch_total_veg"] - mean(covs[,"patch_total_veg"]))/sd(covs[,"patch_total_veg"])
+# water present
+water <- covs[,"water_present"]
+# patch size (scaled)
+size <- (covs[,"patch_size"] - mean(covs[,"patch_size"]))/sd(covs[,"patch_size"])
+# population density 2010 (scaled)
+pop10 <- (covs[,"CMAP_pop10_dens"] - mean(covs[,"CMAP_pop10_dens"]))/sd(covs[,"CMAP_pop10_dens"])
+# population density 2040 (scaled)
+pop40 <- (covs[,"CMAP_pop40_dens"] - mean(covs[,"CMAP_pop40_dens"]))/sd(covs[,"CMAP_pop40_dens"])
 
-#site hydroperiod
-watercov1<-read.csv("water.dryad.csv")
-watercov<-as.character(watercov1[,2])
+# observation covariate - season
+# vector indicating which calander season the observation was obtained
+season <- c(3,4,1,2,3,4,1,2,3,4,1)
+
+# resistance covariates
+# NDVI resistence layer: 1-NDVI = resistance (scaled)
+ndvi_res <- scale(raster("./Data/NDVI_to_Resistence.tif"))
+# 2010 population density raster (scaled)
+pop10_res <- scale(raster("./Data/CMAP_PHH10.tif"))
+# 2040 population density raster (scaled)
+pop40_res <- scale(raster("./Data/CMAP_PHH40.tif"))
+# interstate raster
+interstate_res <- raster("./Data/Interstate_Resistance.tif")
+# patch indicator indicating that habitat patches have 0 resistance
+patch_indicator <- raster("./Data/2018-03-20_patch_indicator_raster.tif")
+
+###################################################
+###################################################
 
 #presence-absence data
 y1<-read.csv("y.wide.dryad.csv")
 y.pre1<-data.matrix(y1[,2:45], 47)
 y.pre<-array(y.pre1, dim=c(47, 3, 15))
-
-#occasion covariates - wind, temp
-wind1<-read.csv("wind.wide.dryad.csv")
-wind.pre1<-data.matrix(wind1[,2:45], 47)
-wind.pre<-array(wind.pre1, dim=c(47, 3, 15))
-
-temp1<-read.csv("temp.wide.dryad.csv")
-temp.pre1<-data.matrix(temp1[,2:45], 47)
-temp.pre<-array(temp.pre1, dim=c(47, 3, 15))
 
 #elevation
 dem.900mag <- raster("dem")
