@@ -1,17 +1,36 @@
 #######################################################################################
 #Spatial Occupancy Model for COYOTE. Written by Travis Gallo and Mason Fidino
 #Modified from Paige Howell, Richard Chandler
-#Updated 3/27/2018
 #######################################################################################
 
 #load mcmc sampler
 #source("mcmcfile.R")
 source("GIV_utility_functions.R")
 
-#load covariate data
+#load patch-level covariate data
 covs <- readRDS("./Data/2018-03-27_patch_covariates.RDS")
+# order covariates so the sampled sites are in the same order as detection data frames
+# rows 1-98 are sampled sites and data is in the same order as y, z, and j matrices (even though Station.ID does not match perfectly)
+covs <- covs[order(covs$Station.ID),]
 
-#site coordinates
+# observation and sampling data
+full_site_names <- read.table("./Data/sites_used_in_sp10_sp13_analysis_6_1_17.txt", header = TRUE)[,1]
+full_site_names[!full_site_names %in% covs$Station.ID] # see the mismatch
+# randomly chose 1 site for patches that had multiple sites. Remove unused sites
+sites_names <- as.character(full_site_names[-c(20,23,70,94,96)])
+
+# load species specific data - remove sites that we do not use in this analysis
+z_array <- df_2_array(read.table("./Data/z_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
+# build y-array and j-matrix
+y_array <- df_2_array(read.table("./Data/y_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
+j_mat <- read.table("./Data/j_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t")[-c(20,23,70,94,96),-c(1,2)]
+
+# take a look at the raw data
+sum(y_array, na.rm=TRUE) # Total dets
+colSums(y_array, na.rm=TRUE) # Dets per season
+sum(rowSums(y_array, na.rm = TRUE) > 0)/nrow(y_array) # Proportion of sites occupied
+
+#site coordinates for all patches
 coords <- as.matrix(covs[, c("x","y")])
 
 # site-level covariates
@@ -32,7 +51,7 @@ pop40 <- (covs[,"CMAP_pop40_dens"] - mean(covs[,"CMAP_pop40_dens"]))/sd(covs[,"C
 
 # observation covariate - season
 # vector indicating which calander season the observation was obtained
-# season <- c(2,3,4,1,2,3,4,1,2,3,4,1,2)
+season <- c(4,1,2,3,4,1,2,3,4,1,2)
 
 # resistance covariates
 # NDVI resistence layer: 1-NDVI = resistance (scaled)
@@ -41,30 +60,11 @@ ndvi_res <- scale(raster("./Data/NDVI_to_Resistence.tif"))
 pop10_res <- scale(raster("./Data/CMAP_PHH10.tif"))
 # 2040 population density raster (scaled)
 pop40_res <- scale(raster("./Data/CMAP_PHH40.tif"))
-# interstate raster
+# interstate raster ### NEED TO FIGURE THIS OUT
 interstate_res <- raster("./Data/Interstate_Resistance.tif")
 # patch indicator indicating that habitat patches have 0 resistance
 patch_indicator <- raster("./Data/2018-03-20_patch_indicator_raster.tif")
 
-# observation and sampling data
-full_site_names <- read.table("./Data/sites_used_in_sp10_sp13_analysis_6_1_17.txt", header = TRUE)
-full_site_names[!full_site_names[,1] %in% covs$Station.ID,] # see the mismatch
-# randomly chose 1 site for patches that had multiple sites. Remove unused sites
-sites_names <- as.character(full_site_names[-c(23,70,69,95,96),])
-
-# load species specific data - remove sites that we do not use in this analysis
-z_array <- df_2_array(read.table("./Data/z_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(23,70,69,95,96),-c(1,2)]
-# build y-array and j-matrix
-y_array <- df_2_array(read.table("./Data/y_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(23,70,69,95,96),-c(1,2)]
-j_mat <- read.table("./Data/j_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t")[-c(23,70,69,95,96),-c(1,2)]
-
-#Take a look at the raw data
-sum(y_array, na.rm=TRUE) # Total dets
-colSums(y_array, na.rm=TRUE) # Dets per season
-sum(rowSums(y_array, na.rm = TRUE) > 0)/nrow(y_array) # Proportion of sites occupied
-
-# STILL NEED TO CHANGE SITE NAMES THAT END IN 0 BACK TO 1 OR VISE VERSA SO THE PATCH INFO MATCHES THE SAMPLING DATA
-# PATCH DATA IS CURRENLTY NOT IN THE SAME ORDER AS SAMPLING DATA
 
 ###################################################
 ###################################################
