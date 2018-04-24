@@ -3,11 +3,8 @@ library(compiler)
 ## MCMC algorithm
 dynroccH <- function(y,            # nSampled x nSeason matrix of detection data*
                     x,             # nSites x 2 matrix of site coordinates. Note that nSampled will usually be <nSites*
-                    patch_ind,     # indicate cells that are considered habitat patches
                     disp_cutoff,   # dispersal distance cutoff
-                    r_cov1,        # resistance covariate
-                    r_cov2,        # resistance covariate
-                    r_cov3,        # resistance covariate
+                    r_covs,        # list of resistance covariate
                     e_cov1,        # extinction covariate
                     e_cov2,        # extinction covariate
                     e_cov3,        # extinction covariate
@@ -18,7 +15,6 @@ dynroccH <- function(y,            # nSampled x nSeason matrix of detection data
                     nIter=10,      # MCMC iterations
                     tune,          # Tuning order: sigma,gamma0.i,gamma0.s,gamma0.p,eps.i,eps.s,eps.p,
                                    #               beta0,beta1,beta2,alpha[1],alpha[2] (12 in total)
-                    estAlpha=TRUE, # Estimate the resistance coefficient? ###IS THIS NEEDED####
                     inits=NULL,    # until you run algorithm, inits are based on what is given.
                     zProp=c("ind","vec"), # Update z matrix by either proposing z(i,k) or z(,k), respectively
                     zProbs=NULL,   # matrix of proposal probs use if zProp="vec"
@@ -71,16 +67,13 @@ dynroccH <- function(y,            # nSampled x nSeason matrix of detection data
       p <- plogis(beta0 + beta1*p.cov1 + beta2*p.cov2) 
       z <- matrix(0, nSites, nYears)
       
-      #Which sites were the reintroduction sites
-      z[c(15, 33, 274),1] <- 1 
-
       ## NOTE: For some organisms and systems the maximum dispersal distance within a single time step 
         #(e.g., annual) may be known and it could be considered very unlikely that colonists would arrive from patches exceeding this distance. 
         #To speed up computation, a neighborhood matrix for each patch could be supplied to eliminate consideration of colonization from neighboring patches 
         #that exceed a reasonable distance from the focal patch.     
       
       ## create resistance surface
-      cost <- exp(alpha[1]*r_cov1 + alpha[2]*r_cov2 + alpha[3]*r_cov3)*patch_ind
+      cost <- exp(alpha[1]*r_covs$ndvi + alpha[2]*r_covs$pop + alpha[3]*r_covs$interstate)*r_covs$patch
       ## calculate conductances among neighbors
       tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
       #adjust diag.conductances
@@ -210,17 +203,17 @@ dynroccH <- function(y,            # nSampled x nSeason matrix of detection data
     #Metropolis update for alpha
     alpha1.cand <- rnorm(1, alpha[1], tune[11])
     #create resistance surface
-    cost <- exp(alpha1.cand*r.cov1 + alpha[2]*r_cov2 + alpha[3]*r_cov3)*patch_ind
+    cost <- exp(alpha1.cand*r_covs$ndvid + alpha[2]*r_covs$pop + alpha[3]*r_covs$interstate)*rcovs$patch
     ## calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16)
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
 
     ## calculate least cost distance between all pairs of sites.
-    D.cand <- costDistance(tr1CorrC,x,x)/1000 #calculate the ecological distance matrix
+    D.cand <- costDistance(tr1CorrC,x)/1000 #calculate the ecological distance matrix
     G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2))
 
-    for(k in 2:nYears) {
-      zkt <- matrix(z[,k-1], nSites, nSites, byrow=TRUE)
+    for(k in 2:nseason) {
+      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
       psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
       ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
@@ -243,16 +236,16 @@ dynroccH <- function(y,            # nSampled x nSeason matrix of detection data
     #Metropolis update for alpha[2]
     alpha2.cand <- rnorm(1, alpha[2], tune[12])
     #create resistance surface
-    cost <- exp(alpha[1]*r.cov1 + alpha2.cand*r.cov2 + alpha[3]*r_cov3)*patch_ind
+    cost <- exp(alpha[1]*r_covs$ndvi + alpha2.cand*r_covs$pop + alpha[3]*r_covs$interstate)*r_covs$patch
     ## calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
     ## calculate least cost distance between all pairs of sites.
-    D.cand <- costDistance(tr1CorrC,x,x)/1000 #calculate the ecological distance matrix
+    D.cand <- costDistance(tr1CorrC,x)/1000 #calculate the ecological distance matrix
     G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2  ))
 
-    for(k in 2:nYears) {
-      zkt <- matrix(z[,k-1], nSites, nSites, byrow=TRUE)
+    for(k in 2:nseason) {
+      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
       psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
       ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
@@ -275,16 +268,16 @@ dynroccH <- function(y,            # nSampled x nSeason matrix of detection data
     #Metropolis update for alpha[3]
     alpha3.cand <- rnorm(1, alpha[2], tune[12])
     #create resistance surface
-    cost <- exp(alpha[1]*r.cov1 + alpha[2]*r.cov2 + alpha3.cand*r_cov3)*patch_ind
+    cost <- exp(alpha[1]*r_covs$ndvi + alpha[2]*r_covs$pop + alpha3.cand*r_covs$interstate)*r_covs$patch
     ## calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
     ## calculate least cost distance between all pairs of sites.
-    D.cand <- costDistance(tr1CorrC,x,x)/1000 #calculate the ecological distance matrix
+    D.cand <- costDistance(tr1CorrC,x)/1000 #calculate the ecological distance matrix
     G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2  ))
     
-    for(k in 2:nYears) {
-      zkt <- matrix(z[,k-1], nSites, nSites, byrow=TRUE)
+    for(k in 2:nseason) {
+      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
       psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
       ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
@@ -306,11 +299,11 @@ dynroccH <- function(y,            # nSampled x nSeason matrix of detection data
     }
 
     ## Metropolis update for sigma
-    sigma.cand <- rnorm(1, sigma, tune[1])
+    sigma.cand <- rnorm(1, sigma, tune[1]) # same weird thing here
     if(sigma.cand > 0) {
         G.cand <- gamma0*exp(-D^2/(2*sigma.cand^2))
-      for(k in 2:nYears) {
-        zkt <- matrix(z[,k-1], nSites, nSites, byrow=TRUE)
+      for(k in 2:nseason) {
+        zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
         gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
         psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
         ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
@@ -336,8 +329,8 @@ dynroccH <- function(y,            # nSampled x nSeason matrix of detection data
         gamma0.cand <- gamma0
         gamma0.cand[isInter] <- gamma0.i.cand
         G.cand <- gamma0.cand*exp(-D^2/(2*sigma^2  ))
-      for(k in 2:nYears) { #nYears
-        zkt <- matrix(z[,k-1], nSites, nSites, byrow=TRUE)
+      for(k in 2:nseason) {
+        zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
         gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
         muz.cand[,k-1] <-(z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])*notFailed[,k]
         ll.z.cand[,k-1] <- dbinom(z[,k], 1, muz.cand[,k-1], log=TRUE)
@@ -476,7 +469,7 @@ dynroccH <- function(y,            # nSampled x nSeason matrix of detection data
        zknown <- anyDet | !notFailed[,k] 
 
        prop.back <- prop.cand <- 0
-       for(i in 1:nSites) {
+       for(i in 1:nsite) {
            if(zknown[i])
                next
            ## Reject highly unlikely proposals (before proposing them)

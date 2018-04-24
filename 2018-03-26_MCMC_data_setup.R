@@ -58,7 +58,7 @@ season <- c(4,1,2,3,4,1,2,3,4,1,2)
 ndvi_res <- scale(raster("./Data/NDVI_to_Resistence.tif"))
 # 2010 population density raster (scaled)
 pop10_res <- scale(raster("./Data/CMAP_PHH10.tif"))
-# 2040 population density raster (scaled)
+# 2040 population density raster (scaled) - for future projections, not initial model run
 pop40_res <- scale(raster("./Data/CMAP_PHH40.tif"))
 # interstate raster
 interstate_res <- raster("./Data/Interstate_Resistance.tif")
@@ -68,6 +68,8 @@ values(interstate_res)[to_replace] <- max(values(ndvi_res), na.rm=TRUE) + max(va
 # patch indicator indicating that habitat patches have 0 resistance
 patch_indicator <- raster("./Data/2018-03-20_patch_indicator_raster.tif")
 
+# create a list of resistence covariates
+res_covs <- as.list(c(ndvi=ndvi_res, pop=pop10_res, interstate=interstate_res, patch=patch_indicator))
 
 ###################################################
 ###################################################
