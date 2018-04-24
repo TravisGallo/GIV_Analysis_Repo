@@ -20,9 +20,9 @@ full_site_names[!full_site_names %in% covs$Station.ID] # see the mismatch
 sites_names <- as.character(full_site_names[-c(20,23,70,94,96)])
 
 # load species specific data - remove sites that we do not use in this analysis
-z_array <- df_2_array(read.table("./Data/z_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
+z_mat <- df_2_array(read.table("./Data/z_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
 # build y-array and j-matrix
-y_array <- df_2_array(read.table("./Data/y_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
+y_mat <- df_2_array(read.table("./Data/y_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
 j_mat <- read.table("./Data/j_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t")[-c(20,23,70,94,96),-c(1,2)]
 
 # take a look at the raw data
@@ -30,7 +30,7 @@ sum(y_array, na.rm=TRUE) # Total dets
 colSums(y_array, na.rm=TRUE) # Dets per season
 sum(rowSums(y_array, na.rm = TRUE) > 0)/nrow(y_array) # Proportion of sites occupied
 
-#site coordinates for all patches
+# site coordinates for all sites
 coords <- as.matrix(covs[, c("x","y")])
 
 # site-level covariates
@@ -60,15 +60,17 @@ ndvi_res <- scale(raster("./Data/NDVI_to_Resistence.tif"))
 pop10_res <- scale(raster("./Data/CMAP_PHH10.tif"))
 # 2040 population density raster (scaled)
 pop40_res <- scale(raster("./Data/CMAP_PHH40.tif"))
-# interstate raster ### NEED TO FIGURE THIS OUT
+# interstate raster
 interstate_res <- raster("./Data/Interstate_Resistance.tif")
+# give resistence a really high value but a non-zero probability of crossing
+to_replace <- values(interstate_res) == 1
+values(interstate_res)[to_replace] <- max(values(ndvi_res), na.rm=TRUE) + max(values(pop10_res), na.rm=TRUE)
 # patch indicator indicating that habitat patches have 0 resistance
 patch_indicator <- raster("./Data/2018-03-20_patch_indicator_raster.tif")
 
 
 ###################################################
 ###################################################
-
 
 
 nSampled <- nrow(y.pre)

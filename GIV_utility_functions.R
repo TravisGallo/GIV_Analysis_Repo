@@ -18,7 +18,7 @@ packs <- c("dplyr", "reshape2", "runjags", "mcmcplots",
            "runjags", 'parallel','raster','rgdal','stringr',
            'foreach','doParallel', 'sf', 'spatialEco', 'rgeos',
            'maptools', 'cleangeo', 'gdistance', 'corrplot',
-           'fasterize')
+           'fasterize', 'compiler')
 
 package_load(packs)
 

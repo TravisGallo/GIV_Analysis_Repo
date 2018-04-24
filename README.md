@@ -9,3 +9,5 @@ A working repo for version control across the Urban Wildlife Institute's GIV ana
 **GIV_utility_functions.R** - functions to be used across various scripts. Source before beginning.
 
 **./Data/2018-03-27_patch_covariates.RDS** - site-level covariates for all patches that were calculated using 2018_03_27_giv_data_compile.R
+
+**metapop_connect_dynoccu_mcmc_sampler.R** - working R script adapting Howell & Chandler Metropolis algorithm to our particular model
