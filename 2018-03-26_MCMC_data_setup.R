@@ -36,6 +36,10 @@ coords <- as.matrix(covs[, c("x","y")])
 # site-level covariates
 # site type: 1 = park; 2 = golf course; 3 = cemetery' 4 = natural area/conservation
 type <- covs[,"site_type"]
+park <- golf <- cem <- rep(0, length(type))
+park[which(type == 1)] <- 1
+golf[which(type == 2)] <- 1
+cem[which(type == 3)] <- 1
 # tree cover (scaled)
 tree <- (covs[,"patch_tree"] - mean(covs[,"patch_tree"]))/sd(covs[,"patch_tree"])
 # vegetation cover (scaled)
@@ -48,12 +52,12 @@ size <- (covs[,"patch_size"] - mean(covs[,"patch_size"]))/sd(covs[,"patch_size"]
 pop10 <- (covs[,"CMAP_pop10_dens"] - mean(covs[,"CMAP_pop10_dens"]))/sd(covs[,"CMAP_pop10_dens"])
 # population density 2040 (scaled)
 pop40 <- (covs[,"CMAP_pop40_dens"] - mean(covs[,"CMAP_pop40_dens"]))/sd(covs[,"CMAP_pop40_dens"])
-
-sitecovs <- cbind(type, tree, total_veg, water, size, pop10)
+# data matrix
+sitecovs <- cbind(tree, total_veg, water, size, pop10, park, golf, cem)
 
 # observation covariate - season
 # vector indicating which calander season the observation was obtained
-season <- c(4,1,2,3,4,1,2,3,4,1,2)
+season_vec <- c(4,1,2,3,4,1,2,3,4,1,2)
 
 # resistance covariates
 # NDVI resistence layer: 1-NDVI = resistance (scaled)
@@ -76,9 +80,43 @@ res_covs <- as.list(c(ndvi=ndvi_res, pop=pop10_res, interstate=interstate_res, p
 ###################################################
 ###################################################
 
+# Test data
 
-nSampled <- nrow(y.pre)
+res_covs <- as.list(c(ndvi_crop, pop_crop, interstate_crop, patch_crop))
+covs2 <- covs[which(covs$patch %in% global_patches_crop@data$Patch),]
+# site coordinates for all sites
+coords <- as.matrix(covs2[, c("x","y")])
+# site-level covariates
+# site type: 1 = park; 2 = golf course; 3 = cemetery' 4 = natural area/conservation
+type <- covs2[,"site_type"]
+park <- golf <- cem <- rep(0, length(type))
+park[which(type == 1)] <- 1
+golf[which(type == 2)] <- 1
+cem[which(type == 3)] <- 1
+# tree cover (scaled)
+tree <- (covs2[,"patch_tree"] - mean(covs2[,"patch_tree"]))/sd(covs2[,"patch_tree"])
+# vegetation cover (scaled)
+total_veg <- (covs2[,"patch_total_veg"] - mean(covs2[,"patch_total_veg"]))/sd(covs2[,"patch_total_veg"])
+# water present
+water <- covs2[,"water_present"]
+# patch size (scaled)
+size <- (covs2[,"patch_size"] - mean(covs2[,"patch_size"]))/sd(covs2[,"patch_size"])
+# population density 2010 (scaled)
+pop10 <- (covs2[,"CMAP_pop10_dens"] - mean(covs2[,"CMAP_pop10_dens"]))/sd(covs2[,"CMAP_pop10_dens"])
+# population density 2040 (scaled)
+pop40 <- (covs2[,"CMAP_pop40_dens"] - mean(covs2[,"CMAP_pop40_dens"]))/sd(covs2[,"CMAP_pop40_dens"])
+# data matrix
+sitecovs2 <- cbind(tree, total_veg, water, size, pop10, park, golf, cem)
 
+x <- coords
+y <- y_mat
+j <- j_mat
+site_covs <- sitecovs2
+obs_covs <- season_vec
+r_covs <- res_covs
+
+
+###################################################
 
 #Code to run sampler with data for 10 MCMC iterations
 ## Tune order: sigma, gamma0.i, gamma0.s, gamma0.p, eps.i, eps.s, eps.p, z, beta0, beta1, beta2, alpha1, alpha2

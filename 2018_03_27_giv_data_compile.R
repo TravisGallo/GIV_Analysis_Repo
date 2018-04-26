@@ -357,12 +357,13 @@ ndvi_res <- raster("./Data/NDVI_to_Resistence.tif")
 interstate_res <- raster("./Data/Interstate_Resistance.tif")
 patch_indicator <- raster("./Data/2018-03-20_patch_indicator_raster.tif")
 # creat small space to test
-test_extent <- extent(sites_sampled)/2
-# crop raster for practice
+test_extent <- extent(sites_sampled)
+# crop raster and patches shape for practice
 ndvi_crop <- crop(ndvi_res, test_extent)
 patch_crop <- crop(patch_indicator, test_extent)
 pop_crop <- crop(pop10_raster, test_extent)
 interstate_crop <- crop(interstate_res, test_extent)
+global_patches_crop <- crop(global_patches, test_extent)
 # scale continous rasters
 ndvi_crop_scl <- scale(ndvi_crop)
 pop_crop_scl <- scale(pop_crop)

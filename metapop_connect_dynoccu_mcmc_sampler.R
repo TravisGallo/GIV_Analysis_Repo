@@ -1,12 +1,13 @@
 library(compiler)
 
 ## MCMC algorithm
-dynroccH <- function(y,            # nSampled x nSeason matrix of detection data*
-                    x,             # nSites x 2 matrix of site coordinates. Note that nSampled will usually be <nSites*
-                    disp_cutoff,   # dispersal distance cutoff
-                    r_covs,        # list of resistance covariate
-                    site_covs,     # site-level covariate
-                    obs_covs,      # observation-level covariate
+dynroccH <- function(y,            # nsampled x nseason matrix of detection data*
+                     j,            # nsampled x nseason matrix of sampling occasions
+                     x,             # nSites x 2 matrix of site coordinates. Note that nSampled will usually be <nSites*
+                     disp_cutoff,   # dispersal distance cutoff
+                     r_covs,        # list of resistance covariate
+                     site_covs,     # site-level covariate
+                     obs_covs,      # observation-level covariate
                     nIter=10,      # MCMC iterations
                     tune,          # Tuning order: sigma,gamma0.i,gamma0.s,gamma0.p,eps.i,eps.s,eps.p,
                                    #               beta0,beta1,beta2,alpha[1],alpha[2] (12 in total)
@@ -28,31 +29,41 @@ dynroccH <- function(y,            # nSampled x nSeason matrix of detection data
   nsampled <- nrow(y)
   
   ## Using this to avoid likelihood calculations for sites not sampled
-  dataYears <- apply(!is.na(y), 3, any) #*
+  dataYears <- apply(!is.na(y), 3, any) #********************* need to see if this stays or is adapted ****************************
   
   ## indicating real detections from data
   anyDetections <- matrix(FALSE, nsite, nseason)
   anyDetections[1:nsampled,] <- as.numeric(y > 0)
 
   ## initial values
+  # resistence
   alpha <- rnorm(3)
-  psi1 <- rnorm(1)
-  psi_lin <- plogis(psi1 %*% psi_covs)
-  z[,1] <- rbinom(nsite, 1, psi_lin)
+  # initial occupancy
+  p0 <- rnorm(1)
+  p <- rnorm(3)
+  psi_lin <- plogis(p0 + p[1]*site_covs[,"park"] + p[2]*site_covs[,"cem"] + p[3]*site_covs[,"golf"])
+  z <- matrix(0, nsite, nseason)
+  z[,1] <- rbinom(nsite, 1, psi_lin) # first season
+  z[1:nsampled,1] <- as.numeric(y_mat[,1] > 0) # set actual detections
+  # colonization
   g0 <- rnorm(1) # intercept
   g <- rnorm(4) # 4 covariates
-  gamma0 <- plogis(g0 + g[1]*site_covs$size + g[2]*site_covs$park + g[3]*site_covs$cem + g[4]*site_covs$golf)
+  gamma0 <- plogis(g0 + g[1]*site_covs[,"size"] + g[2]*site_covs[,"park"] + g[3]*site_covs[,"cem"] + g[4]*site_covs[,"golf"])
   sigma <- runif(1,0,8)
+  # extinction
   e0 <- rnorm(1) # intercept
   e <- rnorm(8) # 8 covariates
-  epsilon <- plogis(e0 + e[1]*site_covs$tree + e[2]*total_veg + e[3]*size + e[4]*pop10 + e[5]*water + 
-                      e[6]*site_covs$park + e[7]*site_covs$cem + e[8]*site_covs$golf)
+  epsilon <- plogis(e0 + e[1]*site_covs[,"tree"] + e[2]*site_covs[,"total_veg"] + e[3]*site_covs[,"size"] + e[4]*site_covs[,"pop10"] +
+                      e[5]*site_covs[,"water"] + e[6]*site_covs[,"park"] + e[7]*site_covs[,"cem"] + e[8]*site_covs[,"golf"])
+  # detection
+  p <- rep(0, nseason)
   a0 <- rnorm(1)
-  a1 <- rnorm(1)
-  p <- plogis(a0 + a*p.cov1) # *******need to use season indexing***********
-  # need to run through the model to general starting values for z[,k-1] based of z[,1] starting values
-  z <- matrix(0, nsite, nseason)
-  z[1:nsampled,1] <- as.numeric(y_mat[,1] > 0) # change to actual detections
+  season <- rnorm(nseason)
+  for(k in 1:nseason){
+    p[k] <- plogis(a0 + obs_covs[season_vec[k]])
+  }
+  # need to run through the model to generate starting values for z[,k-1] based off z[,1] starting values,
+  # psi, gamma, and likelihoods for z and y
   gamma <- psi <- matrix(NA, nsite, nseason-1)
   ll.z <- matrix(0, nsite, nseason)
   ll.y <- matrix(0, nsampled, nseason)
@@ -75,7 +86,7 @@ dynroccH <- function(y,            # nSampled x nSeason matrix of detection data
     z[which(anyDetections[,k]),k] <- 1
     ll.z[,k-1] <- dbinom(z[,k], 1, psi[,k-1], log=TRUE)
     # observation model
-    ll.y[,k] <- dbinom(y[,k], 1, z[1:nsampled,k]*p[,k], log=TRUE) #************************p needs to be corrected***************
+    ll.y[,k] <- dbinom(y[,k], j[,k], z[1:nsampled,k]*p[k], log=TRUE)
   }
   ll.z.cand <- ll.z
   ll.z.sum <- sum(ll.z)
