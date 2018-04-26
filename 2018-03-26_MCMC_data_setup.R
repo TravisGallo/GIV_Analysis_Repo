@@ -49,6 +49,8 @@ pop10 <- (covs[,"CMAP_pop10_dens"] - mean(covs[,"CMAP_pop10_dens"]))/sd(covs[,"C
 # population density 2040 (scaled)
 pop40 <- (covs[,"CMAP_pop40_dens"] - mean(covs[,"CMAP_pop40_dens"]))/sd(covs[,"CMAP_pop40_dens"])
 
+sitecovs <- cbind(type, tree, total_veg, water, size, pop10)
+
 # observation covariate - season
 # vector indicating which calander season the observation was obtained
 season <- c(4,1,2,3,4,1,2,3,4,1,2)
