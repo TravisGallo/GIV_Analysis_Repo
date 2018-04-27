@@ -78,7 +78,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   G <- gamma0*exp(-D^2/(2*sigma^2))
   # incorporate spatially-explicit gamma into occupancy model
   for(k in 2:nseason) { 
-    PrNotColonizedByNeighbor <- 1 - gamma0*exp(-D^2/(2*sigma^2)) * t(z[,rep(1, nsite)])
+    PrNotColonizedByNeighbor <- 1 - gamma0*exp(-D^2/(2*sigma^2)) * t(z[,rep(k-1, nsite)])
     PrNotColonizedAtAll <- apply(PrNotColonizedByNeighbor, 1, prod, na.rm=TRUE)
     gamma[,k-1] <- 1 - PrNotColonizedAtAll
     psi[,k-1] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] #Rescue effect
@@ -86,7 +86,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     z[which(anyDetections[,k] == 1),k] <- 1
     ll.z[,k-1] <- dbinom(z[,k], 1, psi[,k-1], log=TRUE)
     # observation model
-    ll.y[,k] <- dbinom(y[,k], j[,k], z[1:nsampled,k]*p[k], log=TRUE)
+    ll.y[,k-1] <- dbinom(y[,k-1], j[,k-1], z[1:nsampled,k-1]*p[k-1], log=TRUE)
   }
   ll.z.cand <- ll.z
   ll.z.sum <- sum(ll.z, na.rm=TRUE)
