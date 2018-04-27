@@ -71,6 +71,8 @@ interstate_res <- raster("./Data/Interstate_Resistance.tif")
 # give resistence a really high value but a non-zero probability of crossing
 to_replace <- values(interstate_res) == 1
 values(interstate_res)[to_replace] <- max(values(ndvi_res), na.rm=TRUE) + max(values(pop10_res), na.rm=TRUE)
+# extend raster to match all othe rasters
+interstate_res_extend <- crop(extend(ndvi_res, interstate_res), ndvi_res)  
 # patch indicator indicating that habitat patches have 0 resistance
 patch_indicator <- raster("./Data/2018-03-20_patch_indicator_raster.tif")
 
@@ -82,8 +84,20 @@ res_covs <- as.list(c(ndvi=ndvi_res, pop=pop10_res, interstate=interstate_res, p
 
 # Test data
 
+# creat small space to test
+test_extent <- extent(sites_sampled) + 500
+# crop raster and patches shape for practice
+ndvi_crop <- crop(ndvi_res, test_extent)
+patch_crop <- crop(patch_indicator, test_extent)
+pop_crop <- crop(pop10_res, test_extent)
+interstate_crop <- crop(interstate_res_extend, test_extent)
+global_patches_crop <- crop(global_patches, test_extent)
+# list of resistence covariates
 res_covs <- as.list(c(ndvi_crop, pop_crop, interstate_crop, patch_crop))
+
 covs2 <- covs[which(covs$patch %in% global_patches_crop@data$Patch),]
+covs2 <- covs2[order(covs2$Station.ID),]
+covs2 <- covs2[c(1:nsampled, sample(99:12077, 50)),]
 # site coordinates for all sites
 coords <- as.matrix(covs2[, c("x","y")])
 # site-level covariates
@@ -115,6 +129,7 @@ site_covs <- sitecovs2
 obs_covs <- season_vec
 r_covs <- res_covs
 
+plot(coords)
 
 ###################################################
 

@@ -72,24 +72,24 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # calculate conductances among neighbors
   tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
   #adjust diag.conductances
-  tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) 
+  tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE, scl=FALSE) 
   #calculate the ecological distance matrix
-  D <- costDistance(tr1CorrC,x)/1000 
+  D <- costDistance(tr1CorrC,x,x)/1000 
   G <- gamma0*exp(-D^2/(2*sigma^2))
   # incorporate spatially-explicit gamma into occupancy model
   for(k in 2:nseason) { 
-    PrNotColonizedByNeighbor <- 1 - gamma0*exp(-D^2/(2*sigma^2)) * t(z[,rep(k-1, nsite)])
-    PrNotColonizedAtAll <- apply(PrNotColonizedByNeighbor, 1, prod)
+    PrNotColonizedByNeighbor <- 1 - gamma0*exp(-D^2/(2*sigma^2)) * t(z[,rep(1, nsite)])
+    PrNotColonizedAtAll <- apply(PrNotColonizedByNeighbor, 1, prod, na.rm=TRUE)
     gamma[,k-1] <- 1 - PrNotColonizedAtAll
     psi[,k-1] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] #Rescue effect
     z[,k] <- rbinom(nsite, 1, psi[,1])
-    z[which(anyDetections[,k]),k] <- 1
+    z[which(anyDetections[,k] == 1),k] <- 1
     ll.z[,k-1] <- dbinom(z[,k], 1, psi[,k-1], log=TRUE)
     # observation model
     ll.y[,k] <- dbinom(y[,k], j[,k], z[1:nsampled,k]*p[k], log=TRUE)
   }
   ll.z.cand <- ll.z
-  ll.z.sum <- sum(ll.z)
+  ll.z.sum <- sum(ll.z, na.rm=TRUE)
   ll.y.cand <- ll.y
   ll.y.sum <- sum(ll.y, na.rm=TRUE)
   gamma.cand <- gamma

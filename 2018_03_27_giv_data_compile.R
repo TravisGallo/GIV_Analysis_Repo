@@ -337,74 +337,18 @@ saveRDS(covs, "./Data/2018-03-27_patch_covariates.RDS")
 CMAP_pop_sf <- st_as_sf(CMAP_pop)
 
 # convert to raster using the NDVI raster layer as a template
-pop10_raster <- fasterize(CMAP_pop_sf, ndvi_res, field = "PHH10", fun="min")
+pop10_raster <- fasterize(CMAP_pop_sf, ndvi_res, field = "PHH10", fun="min", background = mean(CMAP_pop_sf$PHH10))
 pop40_raster <- fasterize(CMAP_pop_sf, ndvi_res, field = "PHH40", fun="min")
 
 # plot
 plot(pop10_raster)
 
 # write to explore in QGIS
-writeRaster(pop10_raster, "CMAP_PHH10", format = "GTiff")
+writeRaster(pop10_raster, "./Data/CMAP_PHH10", format = "GTiff")
 writeRaster(pop40_raster, "CMAP_PHH40", format = "GTiff")
 
 save.image("2018-04-12_GIV_Workspace.RData")
 
 ######## HARD HAT AREA - PROCEED WITH CAUTION ###############
 
-
-# NDVI resistence layer: 1-NDVI = resistance
-ndvi_res <- raster("./Data/NDVI_to_Resistence.tif")
-interstate_res <- raster("./Data/Interstate_Resistance.tif")
-patch_indicator <- raster("./Data/2018-03-20_patch_indicator_raster.tif")
-# creat small space to test
-test_extent <- extent(sites_sampled)
-# crop raster and patches shape for practice
-ndvi_crop <- crop(ndvi_res, test_extent)
-patch_crop <- crop(patch_indicator, test_extent)
-pop_crop <- crop(pop10_raster, test_extent)
-interstate_crop <- crop(interstate_res, test_extent)
-global_patches_crop <- crop(global_patches, test_extent)
-# scale continous rasters
-ndvi_crop_scl <- scale(ndvi_crop)
-pop_crop_scl <- scale(pop_crop)
-# create random points on the landscapte to test
-p <- as(test_extent, 'SpatialPolygons') 
-rd_pnts <- spsample(p, n=20, type="random")
-proj4string(rd_pnts) <- proj4string(ndvi_crop)
-coords <- coordinates(rd_pnts)
-
-set.seed(1234)
-alpha1 <- abs(rnorm(1,0,1)) # dummy alpha
-set.seed(4321)
-alpha2 <- abs(rnorm(1,0,1)) # dummy alpha
-cost <- exp(alpha1*ndvi_crop_scl + alpha2*pop_crop_scl)*patch_crop # create resistence surface
-# make large highways a barrier
-to_replace <- values(interstate_crop) == 1
-values(cost)[to_replace] <- NA
-plot(cost)
-
-# calculate conductances among neighbors
-tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16)
-# adjust diagnol conductances
-tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE, scl=FALSE)
-# view
-quartz(10,10)
-image(transitionMatrix(tr1))
-# create cost distance matrix
-D <- costDistance(tr1CorrC,coords)/1000
-# create a matrix that limits colonization depending on the dispersal distance of the species
-X <- D
-X[X < 5] <- 1
-X[X > 5] <- 0
-
-# calculate spatially explicit gamma
-set.seed(123)
-gamma0 <- rbeta(1,1,1)
-set.seed(123)
-sigma <- rnorm(1,0,1)
-G <- gamma0*exp(-D^2/(2*sigma^2))*X
-
-  
-plot(rd_pnts, add=TRUE)
-plot(cost)
 
