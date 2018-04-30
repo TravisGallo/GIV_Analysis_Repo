@@ -3,15 +3,16 @@ library(compiler)
 ## MCMC algorithm
 dynroccH <- function(y,            # nsampled x nseason matrix of detection data*
                      j,            # nsampled x nseason matrix of sampling occasions
-                     x,             # nSites x 2 matrix of site coordinates. Note that nSampled will usually be <nSites*
-                     disp_cutoff,   # dispersal distance cutoff
-                     r_covs,        # list of resistance covariate
-                     site_covs,     # site-level covariate
-                     obs_covs,      # observation-level covariate
-                    nIter=10,      # MCMC iterations
-                    tune,          # Tuning order: sigma,gamma0.i,gamma0.s,gamma0.p,eps.i,eps.s,eps.p,
+                     x,            # nSites x 2 matrix of site coordinates. Note that nSampled will usually be <nSites*
+                     disp_cutoff,  # dispersal distance cutoff
+                     r_covs,       # list of resistance covariate
+                     site_covs,    # site-level covariate
+                     obs_covs,     # observation-level covariate
+                     iters=10,     # MCMC iterations
+                     tune,         # Tuning order: sigma,gamma0.i,gamma0.s,gamma0.p,eps.i,eps.s,eps.p,
                                    #               beta0,beta1,beta2,alpha[1],alpha[2] (12 in total)
-                    param_mon,     # character vector of parameters to monitor
+                     param_mon,    # character vector of parameters to monitor
+                    
                     inits=NULL,    # until you run algorithm, inits are based on what is given.
                     zProp=c("ind","vec"), # Update z matrix by either proposing z(i,k) or z(,k), respectively
                     zProbs=NULL,   # matrix of proposal probs use if zProp="vec"
@@ -39,11 +40,11 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # resistence
   alpha <- rnorm(3)
   # initial occupancy
-  p0 <- rnorm(1)
-  p <- rnorm(3)
-  psi_lin <- plogis(p0 + p[1]*site_covs[,"park"] + p[2]*site_covs[,"cem"] + p[3]*site_covs[,"golf"])
+  b0 <- rnorm(1)
+  b <- rnorm(3)
+  psi1 <- plogis(b0 + b[1]*site_covs[,"park"] + b[2]*site_covs[,"cem"] + b[3]*site_covs[,"golf"])
   z <- matrix(0, nsite, nseason)
-  z[,1] <- rbinom(nsite, 1, psi_lin) # first season
+  z[,1] <- rbinom(nsite, 1, psi1) # first season
   z[1:nsampled,1] <- as.numeric(y_mat[,1] > 0) # set actual detections
   # colonization
   g0 <- rnorm(1) # intercept
@@ -74,7 +75,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   #adjust diag.conductances
   tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE, scl=FALSE) 
   #calculate the ecological distance matrix
-  D <- costDistance(tr1CorrC,x,x)/1000 
+  D <- costDistance(tr1CorrC,x,x)/1000
   G <- gamma0*exp(-D^2/(2*sigma^2))
   # incorporate spatially-explicit gamma into occupancy model
   for(k in 2:nseason) { 
@@ -95,35 +96,39 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   gamma.cand <- gamma
   psi.cand <- psi
   
-  ##############################################
-  ##############################################
-  
-  nz1 <- z ## Used to compute expected occupancy at each site
+  # used to compute expected occupancy at each site
+  nz1 <- z
 
   zkup <- rep(0, nseason-1)
-
-  ## posterior samples
-  nPar <- length(param_mon) + nseason # The number of parameters to estimate for each season
-  samples <- array(NA, c(nIter, nPar))
+  
+  # STARTING UPDATING PROCESS
+  # objects to hold posterior samples
+  npar <- length(param_mon) + nseason # The number of parameters to estimate for each season
+  samples <- array(NA, c(iters, npar))
   colnames(samples) <- param_mon
   # monitor z estimates for each patch
-  zK <- matrix(NA, nsite, nIter)
-
+  zK <- matrix(NA, nsite, iters)
+  
+  # indicator that report it parameter is true
   reportit <- report > 0
-    nzup <- rep(0, nYears-1)
+  
+  
+  ###############################################
+  ###############################################
+ 
   zA <- NULL
   if(monitor.z){
-      zA <- array(NA_integer_, c(nsite, nseason, nIter))
+      zA <- array(NA_integer_, c(nsite, nseason, iters))
   }
-
+  # report the first iteration of starting values
   if(reportit) {
       cat("iter 1\n")
-      cat("    theta =", round(c(sigma,gamma0.i,gamma0.s,gamma0.p,epsilon.i,epsilon.s,epsilon.p,beta0,beta1,beta2,alpha), 5), "\n")
+      cat("    theta =", round(c(alpha, ps1, b0, b, gamma0, g0, g, sigma, epsilon, e0, e, p, a0, season), 5), "\n")
       cat("    z[k] =", round(colSums(z), 2), "\n")
       cat("    ll.z =", round(sum(ll.z), 2), "\n")
       cat("    deviance =", round(-2*ll.y.sum, 2), "\n")
       cat("    time =", format(Sys.time()), "\n")
-      if(plot.z) {
+      if(plot.z) { ###############*********************######################
           library(lattice)
           zd <- data.frame(z=as.integer(z), year=factor(rep(2003:2017, each=nSites)),
                            x=as.numeric(x[,1])/1000, y=as.numeric(x[,2])/1000)
@@ -131,53 +136,53 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       }
   }
 
-  ## Sample from posteriors
+  # START SAMPLING FROM POSTERIOR
   for(s in 1:nIter) {
-
+    
+    # update ll.z.sum from the previous iteration
     ll.z.sum <- sum(ll.z) ## This is important!
-
+    
+    # report information from previous iteration
     if(reportit) {
-    if(s %in% c(2:100) || s %% report == 0) {
-      cat("iter", s, "\n")
-      cat("    theta =", round(samples[s-1,1:12], 5), "\n")
-      cat("    z[k] =", zk, "\n")
-      cat("    accepted", round(zkup/(nSites)*100, 1), "percent of z[k] proposals \n")
-      cat("    sum(ll.z) =", ll.z.sum, "\n")
-      cat("    deviance =", round(samples[s-1,"deviance"], 2), "\n")
-      cat("    time =", format(Sys.time()), "\n")
-      if(plot.z) {
+      if(s %in% c(2:100) || s %% report == 0) {
+        cat("iter", s, "\n")
+        cat("    theta =", round(samples[s-1,1:12], 5), "\n")
+        cat("    z[k] =", zk, "\n")
+        cat("    accepted", round(zkup/(nSites)*100, 1), "percent of z[k] proposals \n")
+        cat("    sum(ll.z) =", ll.z.sum, "\n")
+        cat("    deviance =", round(samples[s-1,"deviance"], 2), "\n")
+        cat("    time =", format(Sys.time()), "\n")
+        if(plot.z) {
           library(lattice)
           zd$z <- as.integer(z)
           print(xyplot(y ~ x | year, zd, groups=z, aspect="iso", pch=c(1,16), as.table=TRUE))
+        }
+        }
       }
-    }
-    }
 
-    if(estAlpha) {
-      
-    library(gdistance) 
-    #Metropolis update for alpha
+    #Metropolis update for alpha[1]
+    library(gdistance)
     alpha1.cand <- rnorm(1, alpha[1], tune[11])
-    #create resistance surface
-    cost <- exp(alpha1.cand*r_covs$ndvid + alpha[2]*r_covs$pop + alpha[3]*r_covs$interstate)*rcovs$patch
-    ## calculate conductances among neighbors
-    tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16)
-    tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
-
-    ## calculate least cost distance between all pairs of sites.
-    D.cand <- costDistance(tr1CorrC,x)/1000 #calculate the ecological distance matrix
-    gamma0 <- b0 + b1*site_covs$size + b2*site_covs$park + b3*site_covs$cem + b4*site_covs$golf # linear predictor on baseline colonization
+    # create resistance surface
+    cost <- exp(alpha.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])*r_covs[[4]]
+    # calculate conductances among neighbors
+    tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
+    # adjust diag. conductances
+    tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE, scl=FALSE) 
+    # calculate least cost distance between all pairs of sites.
+    D.cand <- costDistance(tr1CorrC,x,x)/1000 #calculate the ecological distance matrix
     G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2))
-
+    # model
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
       psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
       ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
     }
+    # priors
     prior.alpha.cand <- dnorm(alpha1.cand, 0, 10, log=TRUE)
     prior.alpha <- dnorm(alpha[1], 0, 10, log=TRUE)
-
+    # update
     ll.z.sum.cand <- sum(ll.z.cand)
     if(runif(1) < exp((ll.z.sum.cand + prior.alpha.cand) -
                         (ll.z.sum + prior.alpha))) {
@@ -190,27 +195,27 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z.sum <- ll.z.sum.cand
       }
 
-    #Metropolis update for alpha[2]
+    # Metropolis update for alpha[2]
     alpha2.cand <- rnorm(1, alpha[2], tune[12])
-    #create resistance surface
-    cost <- exp(alpha[1]*r_covs$ndvi + alpha2.cand*r_covs$pop + alpha[3]*r_covs$interstate)*r_covs$patch
-    ## calculate conductances among neighbors
+    # create resistance surface
+    cost <- exp(alpha[1]*r_covs[[1]] + alpha2.cand*r_covs[[2]] + alpha[3]*r_covs[[3]])*r_covs[[4]]    
+    # calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
-    ## calculate least cost distance between all pairs of sites.
-    D.cand <- costDistance(tr1CorrC,x)/1000 #calculate the ecological distance matrix
-    
-    G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2  ))
-
+    # calculate least cost distance between all pairs of sites.
+    D.cand <- costDistance(tr1CorrC,x,x)/1000 #calculate the ecological distance matrix
+    G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2))
+    # model
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
       psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
       ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
     }
+    # priors
     prior.alpha.cand <- dnorm(alpha2.cand, 0, 10, log=TRUE)
     prior.alpha <- dnorm(alpha[2], 0, 10, log=TRUE)
-
+    # update
     ll.z.sum.cand <- sum(ll.z.cand)
     if(runif(1) < exp((ll.z.sum.cand + prior.alpha.cand) -
                         (ll.z.sum + prior.alpha))) {
@@ -223,18 +228,16 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z.sum <- ll.z.sum.cand
     }
     
-    #Metropolis update for alpha[3]
+    # Metropolis update for alpha[3]
     alpha3.cand <- rnorm(1, alpha[2], tune[12])
-    #create resistance surface
-    cost <- exp(alpha[1]*r_covs$ndvi + alpha[2]*r_covs$pop + alpha3.cand*r_covs$interstate)*r_covs$patch
-    ## calculate conductances among neighbors
+    # create resistance surface
+    cost <- exp(alpha[1]*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha3.cand*r_covs[[3]])*r_covs[[4]]    ## calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
-    ## calculate least cost distance between all pairs of sites.
-    D.cand <- costDistance(tr1CorrC,x)/1000 #calculate the ecological distance matrix
-    gamma0 <- b0 + b1*site_covs$size + b2*site_covs$park + b3*site_covs$cem + b4*site_covs$golf # linear predictor on baseline colonization
-    G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2  ))
-    
+    # calculate least cost distance between all pairs of sites.
+    D.cand <- costDistance(tr1CorrC,x,x)/1000 #calculate the ecological distance matrix
+    G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2))
+    # model
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
@@ -255,31 +258,28 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
       }
-    }
 
     ## Metropolis update for sigma
-    sigma.cand <- rnorm(1, sigma, tune[1]) # same weird thing here
-    if(sigma.cand > 0) {
-        G.cand <- gamma0*exp(-D^2/(2*sigma.cand^2))
-      for(k in 2:nseason) {
-        zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
-        gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-        psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-        ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+    sigma.cand <- abs(rnorm(1, sigma, tune[1]))
+    G.cand <- gamma0*exp(-D^2/(2*sigma.cand^2))
+    for(k in 2:nseason) {
+      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
+      gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
+      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
+      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
       }
-      prior.sigma.cand <- dgamma(sigma.cand, 0.001, 0.001)
-      prior.sigma <- dgamma(sigma, 0.001, 0.001)
-      ll.z.sum.cand <- sum(ll.z.cand)
-      if(runif(1) < exp((ll.z.sum.cand + prior.sigma.cand) -
-                        (ll.z.sum + prior.sigma))) {
-          sigma <- sigma.cand
-          gamma <- gamma.cand 
-          ll.z <- ll.z.cand
-          ll.z.sum <- ll.z.sum.cand
-          muz <- muz.cand
-          G <- G.cand
+    prior.sigma.cand <- dgamma(sigma.cand, 0.001, 0.001)
+    prior.sigma <- dgamma(sigma, 0.001, 0.001)
+    ll.z.sum.cand <- sum(ll.z.cand)
+    if(runif(1) < exp((ll.z.sum.cand + prior.sigma.cand) -
+                      (ll.z.sum + prior.sigma))) {
+      sigma <- sigma.cand
+      gamma <- gamma.cand 
+      ll.z <- ll.z.cand
+      ll.z.sum <- ll.z.sum.cand
+      muz <- muz.cand
+      G <- G.cand
       }
-    }
 
     #Metropolis update for gamma0 at intermittent sites (part of the gammaDist calculation)
     prior.gamma0.cand <- prior.gamma0 <- 0
