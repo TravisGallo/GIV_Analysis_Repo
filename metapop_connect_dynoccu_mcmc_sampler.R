@@ -98,7 +98,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   
   # used to compute expected occupancy at each site
   nz1 <- z
-
+  
+  # used to monitor accpetance rate
   zkup <- rep(0, nseason-1)
   
   # STARTING UPDATING PROCESS
