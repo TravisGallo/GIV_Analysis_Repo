@@ -351,4 +351,5 @@ save.image("2018-04-12_GIV_Workspace.RData")
 
 ######## HARD HAT AREA - PROCEED WITH CAUTION ###############
 
-
+# Euclidian Distance
+sqrt((e1-e2)^2 + (n1-n2)^2)

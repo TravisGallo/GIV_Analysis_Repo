@@ -674,7 +674,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
            ## Reject highly unlikely proposals (before proposing them)
            ## This speed trick shouldn't affect anything but
            ## can double check by changing toleranc (tol)
-           if(z[i,k]<1 & muz[i,k-1]<tol)
+           if(z[i,k]<1 & psi[i,k-1]<tol)
                next
            zk.wide <- matrix(z[,k], nSites, nReps)
            zk.cand <- z[,k]
@@ -796,6 +796,3 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
 }
 
 dynroccHC <- cmpfun(dynroccH)
-
-
-#This software has been approved for release by the U.S. Geological Survey (USGS). Although the software has been subjected to rigorous review, the USGS reserves the right to update the software as needed pursuant to further analysis and review. No warranty, expressed or implied, is made by the USGS or the U.S. Government as to the functionality of the software and related material nor shall the fact of release constitute any such warranty. Furthermore, the software is released on condition that neither the USGS nor the U.S. Government shall be held liable for any damages resulting from its authorized or unauthorized use.
