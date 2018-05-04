@@ -3,8 +3,7 @@
 #Modified from Paige Howell, Richard Chandler
 #######################################################################################
 
-#load mcmc sampler
-#source("mcmcfile.R")
+# load internal functions
 source("GIV_utility_functions.R")
 
 #load patch-level covariate data
@@ -26,9 +25,9 @@ y_mat <- df_2_array(read.table("./Data/y_matrix_sp10_sp13_6_1_17.txt", header = 
 j_mat <- read.table("./Data/j_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t")[-c(20,23,70,94,96),-c(1,2)]
 
 # take a look at the raw data
-sum(y_array, na.rm=TRUE) # Total dets
-colSums(y_array, na.rm=TRUE) # Dets per season
-sum(rowSums(y_array, na.rm = TRUE) > 0)/nrow(y_array) # Proportion of sites occupied
+sum(y_mat, na.rm=TRUE) # Total dets
+colSums(y_mat, na.rm=TRUE) # Dets per season
+sum(rowSums(y_mat, na.rm = TRUE) > 0)/nrow(y_mat) # Proportion of sites occupied
 
 # site coordinates for all sites
 coords <- as.matrix(covs[, c("x","y")])
@@ -74,7 +73,11 @@ values(interstate_res)[to_replace] <- max(values(ndvi_res), na.rm=TRUE) + max(va
 # extend raster to match all othe rasters
 interstate_res_extend <- crop(extend(ndvi_res, interstate_res), ndvi_res)  
 # patch indicator indicating that habitat patches have 0 resistance
+# 0 resistence when converted to conductance (1/resistence) gives us infinity, which is what we want but not computationally possible
+# therefore, we give it basically 0 resistence (0.0001) so that it converts to basically infinity (some really high number) when divided by 1
 patch_indicator <- raster("./Data/2018-03-20_patch_indicator_raster.tif")
+val_to_replace <- values(patch_indicator) == 0
+values(patch_indicator)[val_to_replace] <- 0.0001
 
 # create a list of resistence covariates
 res_covs <- as.list(c(ndvi=ndvi_res, pop=pop10_res, interstate=interstate_res, patch=patch_indicator))
@@ -85,7 +88,7 @@ res_covs <- as.list(c(ndvi=ndvi_res, pop=pop10_res, interstate=interstate_res, p
 # Test data
 
 # creat small space to test
-test_extent <- extent(sites_sampled) + 500
+test_extent <- extent(sites_sampled) + 2000
 # crop raster and patches shape for practice
 ndvi_crop <- crop(ndvi_res, test_extent)
 patch_crop <- crop(patch_indicator, test_extent)
@@ -97,7 +100,7 @@ res_covs <- as.list(c(ndvi_crop, pop_crop, interstate_crop, patch_crop))
 
 covs2 <- covs[which(covs$patch %in% global_patches_crop@data$Patch),]
 covs2 <- covs2[order(covs2$Station.ID),]
-covs2 <- covs2[c(1:nsampled, sample(99:12077, 50)),]
+covs2 <- covs2[c(1:98, sample(99:12077, 50)),]
 # site coordinates for all sites
 coords <- as.matrix(covs2[, c("x","y")])
 # site-level covariates
@@ -128,6 +131,8 @@ j <- j_mat
 site_covs <- sitecovs2
 obs_covs <- season_vec
 r_covs <- res_covs
+disp_dist <- 10000
+n.cores <- 4
 
 plot(coords)
 

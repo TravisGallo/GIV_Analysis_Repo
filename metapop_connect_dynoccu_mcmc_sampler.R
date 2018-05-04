@@ -1,10 +1,9 @@
-library(compiler)
 
 ## MCMC algorithm
 dynroccH <- function(y,            # nsampled x nseason matrix of detection data*
                      j,            # nsampled x nseason matrix of sampling occasions
                      x,            # nSites x 2 matrix of site coordinates. Note that nSampled will usually be <nSites*
-                     disp_cutoff,  # dispersal distance cutoff
+                     disp_dist,    # dispersal distance
                      r_covs,       # list of resistance covariate
                      site_covs,    # site-level covariate
                      obs_covs,     # observation-level covariate
@@ -19,7 +18,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
                     monitor.z=FALSE, # store each iteration of the z matrix?
                     report=0,      # Only report progress if >0
                     plot.z=FALSE,  # Plot the latent presence-absence state (if report>0)
-                    tol=0)      # This will reject a proposal of z(i,k)=1 if mu(i,k-1)<tol
+                    tol=0,         # This will reject a proposal of z(i,k)=1 if mu(i,k-1)<tol
+                    n.cores)       # number of cores for parallel 
 {
 
   zProp <- match.arg(zProp)
@@ -30,13 +30,13 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   nsampled <- nrow(y)
   
   ## Using this to avoid likelihood calculations for sites not sampled
-  dataYears <- apply(!is.na(y), 3, any) #********************* need to see if this stays or is adapted ****************************
+  #dataYears <- apply(!is.na(y), 3, any) #********************* need to see if this stays or is adapted ****************************
   
   ## indicating real detections from data
   anyDetections <- matrix(FALSE, nsite, nseason)
   anyDetections[1:nsampled,] <- as.numeric(y > 0)
-
-  ## initial values
+  
+  ## initial values for sampler
   # resistence
   alpha <- rnorm(3)
   # initial occupancy
@@ -71,12 +71,14 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # create resistance surface
   cost <- exp(alpha[1]*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])*r_covs[[4]]
   # calculate conductances among neighbors
+  # create transition matrix - here we convert our cost to conductance by doing 1/resistence
   tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
   #adjust diag.conductances
   tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE, scl=FALSE) 
-  #calculate the ecological distance matrix
-  D <- costDistance(tr1CorrC,x,x)/1000
+  #calculate the ecological distance matrix in parallel
+  D <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, disp_dist, n.cores)/1000
   G <- gamma0*exp(-D^2/(2*sigma^2))
+  G[is.na(G)] <- 0
   # incorporate spatially-explicit gamma into occupancy model
   for(k in 2:nseason) { 
     PrNotColonizedByNeighbor <- 1 - gamma0*exp(-D^2/(2*sigma^2)) * t(z[,rep(k-1, nsite)])
@@ -105,7 +107,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # STARTING UPDATING PROCESS
   # objects to hold posterior samples
   npar <- length(param_mon) + nseason # The number of parameters to estimate for each season
-  samples <- array(NA, c(iters, npar))
+  samples <- matrix(NA, iters, npar)
   colnames(samples) <- param_mon
   # monitor z estimates for each patch
   zK <- matrix(NA, nsite, iters)
@@ -113,13 +115,10 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # indicator that report it parameter is true
   reportit <- report > 0
   
-  
-  ###############################################
-  ###############################################
- 
+  # create array that will hold z values
   zA <- NULL
   if(monitor.z){
-      zA <- array(NA_integer_, c(nsite, nseason, iters))
+      zA <- array(NA, c(nsite, nseason, iters))
   }
   # report the first iteration of starting values
   if(reportit) {
@@ -129,11 +128,11 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       cat("    ll.z =", round(sum(ll.z), 2), "\n")
       cat("    deviance =", round(-2*ll.y.sum, 2), "\n")
       cat("    time =", format(Sys.time()), "\n")
-      if(plot.z) { ###############*********************######################
+      if(plot.z) {
           library(lattice)
-          zd <- data.frame(z=as.integer(z), year=factor(rep(2003:2017, each=nSites)),
+          zd <- data.frame(z=as.integer(z), season=rep(1:11, each=nsite),
                            x=as.numeric(x[,1])/1000, y=as.numeric(x[,2])/1000)
-          print(xyplot(y ~ x | year, zd, groups=z, aspect="iso", pch=c(1,16), as.table=TRUE))
+          print(xyplot(y ~ x | season, zd, groups=z, aspect="iso", pch=c(1,16), as.table=TRUE))
       }
   }
 
@@ -156,13 +155,12 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         if(plot.z) {
           library(lattice)
           zd$z <- as.integer(z)
-          print(xyplot(y ~ x | year, zd, groups=z, aspect="iso", pch=c(1,16), as.table=TRUE))
+          print(xyplot(y ~ x | season, zd, groups=z, aspect="iso", pch=c(1,16), as.table=TRUE))
         }
         }
       }
 
     #Metropolis update for alpha[1]
-    library(gdistance)
     alpha1.cand <- rnorm(1, alpha[1], tune[11])
     # create resistance surface
     cost <- exp(alpha.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])*r_covs[[4]]
@@ -236,7 +234,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
     # calculate least cost distance between all pairs of sites.
-    D.cand <- costDistance(tr1CorrC,x,x)/1000 #calculate the ecological distance matrix
+    D.cand <- costDistance(tr1CorrC,x[i,],as.matrix(x.list[[i]]))/1000 #calculate the ecological distance matrix
     G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2))
     # model
     for(k in 2:nseason) {
@@ -660,65 +658,52 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       G <- G.cand
     }
     
+    # update z
+    zkup <- rep(0, nseason-1)
+    for(k in 2:nseason) {
+      anyDet <- anyDetections[,k]==1 
+      prop.back <- prop.cand <- 0
+      for(i in 1:nsite) {
+        # z candidate values
+        zk.cand <- z[,k] # grab a vector of z candidates from initial values for each season
+        zk.cand[i] <- 1-z[i,k] # flip each one WHY?
+        # ll. y candidate
+        ll.y.tmp <- ll.y.cand.tmp <- 0
+        if(i <= nsampled & j_mat[i,k] > 0) { # only use sampled sites
+          ll.y.cand.tmp <- dbinom(y[i,k], j_mat[i,k], zk.cand[i]*p[k], log=TRUE)
+          ll.y.tmp <- sum(ll.y[i,k], na.rm=TRUE) # trick to turn all NA's to 0
+          }
+        # prior for z
+        # note from Howell et al (2018) code: Prior must be calculated for time k and k+1 b/c change in z affects both
+        ll.z.cand[i,k-1] <- dbinom(zk.cand[i], 1, psi[i,k-1], log=TRUE)
+        ll.z2 <- ll.z2.cand <- 0
+        if(k < nseason) {
+          zkt.cand <- matrix(zk.cand, nsite, nsite, byrow=TRUE)
+          gamma.cand[,k] <- 1 - exp(rowSums(log(1-G*zkt.cand)))
+          psi.cand[,k] <- (zk.cand*(1-epsilon*(1-gamma.cand[,k])) + (1-zk.cand)*gamma.cand[,k])
+          ll.z.cand[,k] <- dbinom(z[,k+1], 1, psi.cand[,k], log=TRUE)
+          ll.z2 <- sum(ll.z[,k])
+          ll.z2.cand <- sum(ll.z.cand[,k])
+          }
+        if(runif(1) < exp((sum(ll.y.cand.tmp, na.rm=TRUE) + ll.z.cand[i,k-1] + ll.z2.cand + prop.back) -
+                          (ll.y.tmp + ll.z[i,k-1] + ll.z2 + prop.cand))) {
+          z[,k] <- zk.cand
+          ll.z[i,k-1] <- ll.z.cand[i,k-1]
+          if(k < nseason) {
+            gamma[,k] <- gamma.cand[,k]
+            psi[,k] <- psi.cand[,k]
+            ll.z[,k] <- ll.z.cand[,k]
+            }
+          if(i <= nsampled & j_mat[i,k] > 0) {
+            ll.y[i,k] <- ll.y.cand.tmp
+            }
+          zkup[k-1] <- zkup[k-1] + 1
+        }
+      }
+    }
     
-    ## update z
-    ## We can update each z(i,t) individually, and it results in better mixing than updating a vector of z's
-    zkup <- rep(0, nYears-1)
-   for(k in 2:nseason) {
-       anyDet <- anyDetections[,k]==1 
-
-       prop.back <- prop.cand <- 0
-       for(i in 1:nsite) {
-           if(zknown[i])
-               next
-           ## Reject highly unlikely proposals (before proposing them)
-           ## This speed trick shouldn't affect anything but
-           ## can double check by changing toleranc (tol)
-           if(z[i,k]<1 & psi[i,k-1]<tol)
-               next
-           zk.wide <- matrix(z[,k], nSites, nReps)
-           zk.cand <- z[,k]
-           zk.cand[i] <- 1-z[i,k]
-           zk.cand.wide <- matrix(zk.cand, nSites, nReps)
-
-           ll.y.tmp <- 0
-           ll.y.cand.tmp <- 0
-           if((k > 4) & (i <= nSampled)) { ## Ignore first 4 years without data
-               ll.y.cand.tmp <- dbinom(y[i,k], 1, zk.cand[i]*p[i,,k], log=TRUE)
-               ll.y.tmp <- sum(ll.y[i,k], na.rm=TRUE)
-           }
-           ## RC: Prior must be calculated for time k and k+1 b/c change in z affects both
-           ll.z.cand[i,k-1] <- dbinom(zk.cand[i], 1, psi[i,k-1], log=TRUE)
-           ll.z2 <- ll.z2.cand <- 0
-           if(k < nseason) {
-               zkt.cand <- matrix(zk.cand, nsite, nsite, byrow=TRUE)
-               gamma.cand[,k] <- 1 - exp(rowSums(log(1-G*zkt.cand)))
-               psi.cand[,k] <- (zk.cand*(1-epsilon*(1-gamma.cand[,k])) + (1-zk.cand)*gamma.cand[,k])
-               ll.z.cand[,k] <- dbinom(z[,k+1], 1, psi.cand[,k], log=TRUE)
-               ll.z2 <- sum(ll.z[,k])
-               ll.z2.cand <- sum(ll.z.cand[,k])
-           }
-           if(runif(1) < exp((sum(ll.y.cand.tmp, na.rm=TRUE) + ll.z.cand[i,k-1] +
-                              ll.z2.cand + prop.back) -
-                             (ll.y.tmp + ll.z[i,k-1] +
-                              ll.z2 + prop.cand))) {
-               z[,k] <- zk.cand
-               ll.z[i,k-1] <- ll.z.cand[i,k-1]
-               if(k < nYears) {
-                   gamma[,k] <- gamma.cand[,k]
-                   psi[,k] <- psi.cand[,k]
-                   ll.z[,k] <- ll.z.cand[,k]
-               }
-               if((i <= nSampled) & (k>4)) {
-                   ll.y[i,,k] <- ll.y.cand.tmp
-               }
-               zkup[k-1] <- zkup[k-1] + 1
-           }
-       }
-   }
-
     nz1 <- nz1+z
-
+    
     #Update for beta0
     beta0.cand<-rnorm(1, beta0, tune[8])
     p.cand <- plogis(beta0.cand + beta1*p.cov1 + beta2*p.cov2)

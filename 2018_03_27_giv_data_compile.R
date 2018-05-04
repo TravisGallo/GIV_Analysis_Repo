@@ -352,4 +352,12 @@ save.image("2018-04-12_GIV_Workspace.RData")
 ######## HARD HAT AREA - PROCEED WITH CAUTION ###############
 
 # Euclidian Distance
-sqrt((e1-e2)^2 + (n1-n2)^2)
+x.loc <- vector("list", nrow(x))
+x.list <- vector("list", nrow(x))
+for(j in 1:nrow(x)){
+  x.loc[[j]] <- which(sqrt((x[j,1]-x[,1])^2 + (x[j,2]-x[,2])^2) < 10000)
+  x.list[[j]] <- x[x.loc[[j]],]
+}
+
+
+sapply(x.list, nrow)
