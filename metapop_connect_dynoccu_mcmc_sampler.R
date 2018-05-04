@@ -73,9 +73,9 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # calculate conductances among neighbors
   # create transition matrix - here we convert our cost to conductance by doing 1/resistence
   tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
-  #adjust diag.conductances
+  # adjust diag. conductances
   tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE, scl=FALSE) 
-  #calculate the ecological distance matrix in parallel
+  # calculate the ecological distance matrix in parallel
   D <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, disp_dist, n.cores)/1000
   G <- gamma0*exp(-D^2/(2*sigma^2))
   G[is.na(G)] <- 0
