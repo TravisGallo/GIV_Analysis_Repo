@@ -58,29 +58,47 @@ sitecovs <- cbind(tree, total_veg, water, size, pop10, park, golf, cem)
 # vector indicating which calander season the observation was obtained
 season_vec <- c(4,1,2,3,4,1,2,3,4,1,2)
 
-# resistance covariates
+## resistance covariates
+# study extent to crop larger extent rasters
+study_extent <- extent(global_patches) + 5000
+
 # NDVI resistence layer: 1-NDVI = resistance (scaled)
-ndvi_res <- scale(raster("./Data/NDVI_to_Resistence.tif"))
+ndvi_res <- crop(raster("./Data/NDVI_to_Resistence.tif"), study_extent)
+ndvi_coarse <- aggregate(ndvi_res, fact=4, fun=mean) # scale up raster to 120x120
+ndvi_scale <- scale(ndvi_coarse)
 # 2010 population density raster (scaled)
-pop10_res <- scale(raster("./Data/CMAP_PHH10.tif"))
+pop10_res <- crop(raster("./Data/CMAP_PHH10.tif"), study_extent)
+pop10_coarse <- aggregate(pop10_res, fact=4, fun=mean)
+pop10_scale <- scale(pop10_coarse)
 # 2040 population density raster (scaled) - for future projections, not initial model run
-pop40_res <- scale(raster("./Data/CMAP_PHH40.tif"))
-# interstate raster
-interstate_res <- raster("./Data/Interstate_Resistance.tif")
+pop40_res <- crop(raster("./Data/CMAP_PHH40.tif"), study_extent)
+pop40_coarse <- aggregate(pop40_res, fact=4, fun=mean)
+pop40_scale <- scale(pop40_coarse)
+
+# interstate raster - ULTIMATELY DID NOT USE INTERSTATES AS A POTENTIAL BARRIER
+#interstate_res <- raster("./Data/Interstate_Resistance.tif")
 # give resistence a really high value but a non-zero probability of crossing
-to_replace <- values(interstate_res) == 1
-values(interstate_res)[to_replace] <- max(values(ndvi_res), na.rm=TRUE) + max(values(pop10_res), na.rm=TRUE)
+#to_replace <- values(interstate_coarse) == 1
+#values(interstate_coarse)[to_replace] <- max(values(ndvi_scale), na.rm=TRUE) + max(values(pop10_scale), na.rm=TRUE)
 # extend raster to match all othe rasters
-interstate_res_extend <- crop(extend(ndvi_res, interstate_res), ndvi_res)  
+#interstate_extend <- crop(extend(ndvi_coarse, interstate_coarse), ndvi_coarse)  
+
 # patch indicator indicating that habitat patches have 0 resistance
 # 0 resistence when converted to conductance (1/resistence) gives us infinity, which is what we want but not computationally possible
 # therefore, we give it basically 0 resistence (0.0001) so that it converts to basically infinity (some really high number) when divided by 1
-patch_indicator <- raster("./Data/2018-03-20_patch_indicator_raster.tif")
-val_to_replace <- values(patch_indicator) == 0
-values(patch_indicator)[val_to_replace] <- 0.0001
+patch_indicator <- fasterize(st_as_sf(global_patches), ndvi_coarse, field = "AREA", fun="max")
+val_to_replace0 <- !is.na(values(patch_indicator))
+values(patch_indicator)[val_to_replace0] <- 1
+val_to_replace1 <- is.na(values(patch_indicator))
+values(patch_indicator)[val_to_replace1] <- 0
+
+# cells from the ndvi and population raster become 0 to estimate transition cost within patches seperately from the matrix
+to_0 <- values(patch_indicator) == 1
+values(ndvi_scale)[to_0] <- 0
+values(pop10_scale)[to_0] <- 0
 
 # create a list of resistence covariates
-res_covs <- as.list(c(ndvi=ndvi_res, pop=pop10_res, interstate=interstate_res, patch=patch_indicator))
+res_covs <- as.list(c(ndvi=ndvi_scale, pop=pop10_scale, patch=patch_indicator))
 
 ###################################################
 ###################################################
@@ -90,13 +108,13 @@ res_covs <- as.list(c(ndvi=ndvi_res, pop=pop10_res, interstate=interstate_res, p
 # creat small space to test
 test_extent <- extent(sites_sampled) + 2000
 # crop raster and patches shape for practice
-ndvi_crop <- crop(ndvi_res, test_extent)
+ndvi_crop <- crop(ndvi_scale, test_extent)
 patch_crop <- crop(patch_indicator, test_extent)
-pop_crop <- crop(pop10_res, test_extent)
-interstate_crop <- crop(interstate_res_extend, test_extent)
+pop_crop <- crop(pop10_scale, test_extent)
+#interstate_crop <- crop(interstate_res_extend, test_extent)
 global_patches_crop <- crop(global_patches, test_extent)
 # list of resistence covariates
-res_covs <- as.list(c(ndvi_crop, pop_crop, interstate_crop, patch_crop))
+res_covs <- as.list(c(ndvi_crop, pop_crop, patch_crop))
 
 covs2 <- covs[which(covs$patch %in% global_patches_crop@data$Patch),]
 covs2 <- covs2[order(covs2$Station.ID),]

@@ -44,8 +44,6 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   b <- rnorm(3)
   psi1 <- plogis(b0 + b[1]*site_covs[,"park"] + b[2]*site_covs[,"cem"] + b[3]*site_covs[,"golf"])
   z <- matrix(0, nsite, nseason)
-  z[,1] <- rbinom(nsite, 1, psi1) # first season
-  z[1:nsampled,1] <- as.numeric(y_mat[,1] > 0) # set actual detections
   # colonization
   g0 <- rnorm(1) # intercept
   g <- rnorm(4) # 4 covariates
@@ -65,11 +63,13 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   }
   # need to run through the model to generate starting values for z[,k-1] based off z[,1] starting values,
   # psi, gamma, and likelihoods for z and y
-  gamma <- psi <- matrix(NA, nsite, nseason-1)
+  gamma <- matrix(NA, nsite, nseason-1)
+  psi <- matrix(NA, nsite, nseason)
+  psi[,1] <- psi1
   ll.z <- matrix(0, nsite, nseason)
   ll.y <- matrix(0, nsampled, nseason)
   # create resistance surface
-  cost <- exp(alpha[1]*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])*r_covs[[4]]
+  cost <- exp(alpha[1]*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])
   # calculate conductances among neighbors
   # create transition matrix - here we convert our cost to conductance by doing 1/resistence
   tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
@@ -80,23 +80,30 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   G <- gamma0*exp(-D^2/(2*sigma^2))
   G[is.na(G)] <- 0
   # incorporate spatially-explicit gamma into occupancy model
+  z[,1] <- rbinom(nsite, 1, psi[,1])
+  z[which(anyDetections[,1] == 1),1] <- 1
+  ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
+  ll.y[,1] <- dbinom(y[,1], j[,1], z[1:nsampled,1]*p[1], log=TRUE)
   for(k in 2:nseason) { 
     PrNotColonizedByNeighbor <- 1 - gamma0*exp(-D^2/(2*sigma^2)) * t(z[,rep(k-1, nsite)])
     PrNotColonizedAtAll <- apply(PrNotColonizedByNeighbor, 1, prod, na.rm=TRUE)
     gamma[,k-1] <- 1 - PrNotColonizedAtAll
-    psi[,k-1] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] #Rescue effect
-    z[,k] <- rbinom(nsite, 1, psi[,1])
+    psi[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] #Rescue effect
+    z[,k] <- rbinom(nsite, 1, psi[,k])
     z[which(anyDetections[,k] == 1),k] <- 1
-    ll.z[,k-1] <- dbinom(z[,k], 1, psi[,k-1], log=TRUE)
+    ll.z[,k] <- dbinom(z[,k], 1, psi[,k], log=TRUE)
     # observation model
-    ll.y[,k-1] <- dbinom(y[,k-1], j[,k-1], z[1:nsampled,k-1]*p[k-1], log=TRUE)
+    ll.y[,k] <- dbinom(y[,k], j[,k], z[1:nsampled,k]*p[k], log=TRUE)
   }
   ll.z.cand <- ll.z
+  if(any(is.na(ll.y))){
+    ll.z[is.na(ll.y)] <- NA
+  }
   ll.z.sum <- sum(ll.z, na.rm=TRUE)
   ll.y.cand <- ll.y
   ll.y.sum <- sum(ll.y, na.rm=TRUE)
-  gamma.cand <- gamma
-  psi.cand <- psi
+  #gamma.cand <- gamma
+  #psi.cand <- psi
   
   # used to compute expected occupancy at each site
   nz1 <- z
@@ -163,7 +170,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     #Metropolis update for alpha[1]
     alpha1.cand <- rnorm(1, alpha[1], tune[11])
     # create resistance surface
-    cost <- exp(alpha.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])*r_covs[[4]]
+    cost <- exp(alpha.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])
     # calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     # adjust diag. conductances
@@ -197,7 +204,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     # Metropolis update for alpha[2]
     alpha2.cand <- rnorm(1, alpha[2], tune[12])
     # create resistance surface
-    cost <- exp(alpha[1]*r_covs[[1]] + alpha2.cand*r_covs[[2]] + alpha[3]*r_covs[[3]])*r_covs[[4]]    
+    cost <- exp(alpha.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]]) 
     # calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
@@ -230,7 +237,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     # Metropolis update for alpha[3]
     alpha3.cand <- rnorm(1, alpha[2], tune[12])
     # create resistance surface
-    cost <- exp(alpha[1]*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha3.cand*r_covs[[3]])*r_covs[[4]]    ## calculate conductances among neighbors
+    cost <- exp(alpha.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])
+    ## calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
     # calculate least cost distance between all pairs of sites.

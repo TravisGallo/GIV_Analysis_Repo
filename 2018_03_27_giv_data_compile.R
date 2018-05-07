@@ -351,13 +351,18 @@ save.image("2018-04-12_GIV_Workspace.RData")
 
 ######## HARD HAT AREA - PROCEED WITH CAUTION ###############
 
-# Euclidian Distance
-x.loc <- vector("list", nrow(x))
-x.list <- vector("list", nrow(x))
-for(j in 1:nrow(x)){
-  x.loc[[j]] <- which(sqrt((x[j,1]-x[,1])^2 + (x[j,2]-x[,2])^2) < 10000)
-  x.list[[j]] <- x[x.loc[[j]],]
-}
+r <- raster(nrow=4,ncol=8)
+
+r2 <- raster(nrow=2,ncol=4)
+
+r <- setValues(r,values = 1:32)
+
+r_agg <- aggregate(r,fact=2,fun=mean)
+
+r_resam <- resample(r,r2,method='bilinear')
+
+values(r_resam) == values(r_agg)
 
 
-sapply(x.list, nrow)
+values(r_resam)
+## [1]  5.5  7.5  9.5 11.5 21.5 23.5 25.5 27.5
