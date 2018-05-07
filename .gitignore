@@ -37,5 +37,10 @@ vignettes/*.pdf
 .png
 .jpg
 
-# Raster files
+# GIS files
 .tif
+.shp
+.dbf
+.prj
+.qpj
+.shx
