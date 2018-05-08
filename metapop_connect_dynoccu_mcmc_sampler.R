@@ -21,9 +21,6 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
                     tol=0,         # This will reject a proposal of z(i,k)=1 if mu(i,k-1)<tol
                     n.cores)       # number of cores for parallel 
 {
-
-  zProp <- match.arg(zProp)
-
   ## Dimensions
   nsite <- nrow(x) # Number of possible sites instead of only the sites sampled
   nseason <- ncol(y)
@@ -40,30 +37,28 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # resistence
   alpha <- rnorm(3)
   # initial occupancy
-  b0 <- rnorm(1)
-  b <- rnorm(3)
-  psi1 <- plogis(b0 + b[1]*site_covs[,"park"] + b[2]*site_covs[,"cem"] + b[3]*site_covs[,"golf"])
-  z <- matrix(0, nsite, nseason)
+  b0.psi1 <- rnorm(1)
+  b.psi1 <- rnorm(3)
   # colonization
-  g0 <- rnorm(1) # intercept
-  g <- rnorm(4) # 4 covariates
-  gamma0 <- plogis(g0 + g[1]*site_covs[,"size"] + g[2]*site_covs[,"park"] + g[3]*site_covs[,"cem"] + g[4]*site_covs[,"golf"])
+  b0.gam <- rnorm(1) # intercept
+  b.gam <- rnorm(4) # 4 covariates
+  gamma0 <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
   sigma <- runif(1,0,8)
   # extinction
-  e0 <- rnorm(1) # intercept
-  e <- rnorm(8) # 8 covariates
-  epsilon <- plogis(e0 + e[1]*site_covs[,"tree"] + e[2]*site_covs[,"total_veg"] + e[3]*site_covs[,"size"] + e[4]*site_covs[,"pop10"] +
-                      e[5]*site_covs[,"water"] + e[6]*site_covs[,"park"] + e[7]*site_covs[,"cem"] + e[8]*site_covs[,"golf"])
+  b0.eps <- rnorm(1) # intercept
+  b.eps <- rnorm(8) # 8 covariates
+  epsilon <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
+                      b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
   # detection
   p <- rep(0, nseason)
   a0 <- rnorm(1)
-  season <- rnorm(nseason)
-  for(k in 1:nseason){
-    p[k] <- plogis(a0 + obs_covs[season_vec[k]])
-  }
+  season <- rnorm(4)
+  season[1] <- 0
+  p <- plogis(a0 + season[season_vec])
   # need to run through the model to generate starting values for z[,k-1] based off z[,1] starting values,
   # psi, gamma, and likelihoods for z and y
   gamma <- matrix(NA, nsite, nseason-1)
+  psi1 <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] + b.psi1[2]*site_covs[,"cem"] + b.psi1[3]*site_covs[,"golf"])
   psi <- matrix(NA, nsite, nseason)
   psi[,1] <- psi1
   ll.z <- matrix(0, nsite, nseason)
@@ -80,6 +75,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   G <- gamma0*exp(-D^2/(2*sigma^2))
   G[is.na(G)] <- 0
   # incorporate spatially-explicit gamma into occupancy model
+  z <- matrix(0, nsite, nseason)
   z[,1] <- rbinom(nsite, 1, psi[,1])
   z[which(anyDetections[,1] == 1),1] <- 1
   ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
@@ -102,18 +98,19 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   ll.z.sum <- sum(ll.z, na.rm=TRUE)
   ll.y.cand <- ll.y
   ll.y.sum <- sum(ll.y, na.rm=TRUE)
-  #gamma.cand <- gamma
-  #psi.cand <- psi
+  gamma.cand <- gamma
+  psi.cand <- psi
   
   # used to compute expected occupancy at each site
   nz1 <- z
   
-  # used to monitor accpetance rate
-  zkup <- rep(0, nseason-1)
-  
   # STARTING UPDATING PROCESS
   # objects to hold posterior samples
-  npar <- length(param_mon) + nseason # The number of parameters to estimate for each season
+  
+  param_mon <- c("alpha[1]","alpha[2]", "alpha[3]", "sigma", "b0.gam", "b.gam[1]", "b.gam[2]", "b.gam[3]", "b.gam[4]", "b0.psi1", 
+    "b.psi1[1]", "b.psi1[3]", "b.psi1[3]", "b0.eps", "b.eps[1]", "b.eps[2]", "b.eps[3]", "b.eps[4]", "b.eps[5]", "b.eps[6]", "b.eps[7]",
+    "b.eps[8]", "a0", "season[2]","season[3]", "season[4]", "zk", "deviance")
+  npar <- length(param_mon) + nseason-1 # The number of parameters to estimate and zk for 13 seasons
   samples <- matrix(NA, iters, npar)
   colnames(samples) <- param_mon
   # monitor z estimates for each patch
@@ -130,7 +127,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # report the first iteration of starting values
   if(reportit) {
       cat("iter 1\n")
-      cat("    theta =", round(c(alpha, ps1, b0, b, gamma0, g0, g, sigma, epsilon, e0, e, p, a0, season), 5), "\n")
+      cat("    theta =", round(c(alpha, psi1, b0.gam, b.gam, gamma0, b0.gam, b.gam, sigma, epsilon, b0.eps, b.eps, p, a0, season), 5), "\n")
       cat("    z[k] =", round(colSums(z), 2), "\n")
       cat("    ll.z =", round(sum(ll.z), 2), "\n")
       cat("    deviance =", round(-2*ll.y.sum, 2), "\n")
@@ -144,10 +141,10 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   }
 
   # START SAMPLING FROM POSTERIOR
-  for(s in 1:nIter) {
+  for(s in 1:iters) {
     
     # update ll.z.sum from the previous iteration
-    ll.z.sum <- sum(ll.z) ## This is important!
+    ll.z.sum <- sum(ll.z, na.rm=TRUE) ## This is important!
     
     # report information from previous iteration
     if(reportit) {
@@ -155,7 +152,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         cat("iter", s, "\n")
         cat("    theta =", round(samples[s-1,1:12], 5), "\n")
         cat("    z[k] =", zk, "\n")
-        cat("    accepted", round(zkup/(nSites)*100, 1), "percent of z[k] proposals \n")
+        cat("    accepted", round((zkup/nsite)*100, 1), "percent of z[k] proposals \n")
         cat("    sum(ll.z) =", ll.z.sum, "\n")
         cat("    deviance =", round(samples[s-1,"deviance"], 2), "\n")
         cat("    time =", format(Sys.time()), "\n")
@@ -167,23 +164,29 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         }
       }
 
-    #Metropolis update for alpha[1]
+    ## Metropolis update for alpha[1]
     alpha1.cand <- rnorm(1, alpha[1], tune[11])
     # create resistance surface
-    cost <- exp(alpha.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])
+    cost <- exp(alpha1.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])
     # calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     # adjust diag. conductances
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE, scl=FALSE) 
-    # calculate least cost distance between all pairs of sites.
-    D.cand <- costDistance(tr1CorrC,x,x)/1000 #calculate the ecological distance matrix
-    G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2))
+    # calculate the ecological distance matrix in parallel
+    D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, disp_dist, n.cores)/1000
+    G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's are distances that were too far to colonize
+    G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
+    z[,1] <- rbinom(nsite, 1, psi[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi[,k], log=TRUE)
     }
     # priors
     prior.alpha1.cand <- dnorm(alpha1.cand, 0, 10, log=TRUE)
@@ -191,32 +194,37 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
     if(runif(1) < exp((ll.z.sum.cand + prior.alpha1.cand) -
-                        (ll.z.sum + prior.alpha1))) {
+                      (ll.z.sum + prior.alpha1))) {
       alpha[1] <- alpha1.cand
       D <- D.cand
       G <- G.cand
       gamma <- gamma.cand
-      psi <- psi.cand
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
-      }
+    }
 
-    # Metropolis update for alpha[2]
+    ## Metropolis update for alpha[2]
     alpha2.cand <- rnorm(1, alpha[2], tune[12])
     # create resistance surface
-    cost <- exp(alpha.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]]) 
+    cost <- exp(alpha[1]*r_covs[[1]] + alpha2.cand*r_covs[[2]] + alpha[3]*r_covs[[3]]) 
     # calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
-    # calculate least cost distance between all pairs of sites.
-    D.cand <- costDistance(tr1CorrC,x,x)/1000 #calculate the ecological distance matrix
-    G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2))
+    # calculate the ecological distance matrix in parallel
+    D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, disp_dist, n.cores)/1000
+    G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's are distances that were too far to colonize
+    G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
+    z[,1] <- rbinom(nsite, 1, psi[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi[,k], log=TRUE)
     }
     # priors
     prior.alpha2.cand <- dnorm(alpha2.cand, 0, 10, log=TRUE)
@@ -224,32 +232,37 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
     if(runif(1) < exp((ll.z.sum.cand + prior.alpha2.cand) -
-                        (ll.z.sum + prior.alpha2))) {
+                      (ll.z.sum + prior.alpha2))) {
       alpha[2] <- alpha2.cand
       D <- D.cand
       G <- G.cand
       gamma <- gamma.cand
-      psi <- psi.cand
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
     
-    # Metropolis update for alpha[3]
-    alpha3.cand <- rnorm(1, alpha[2], tune[12])
+    ## Metropolis update for alpha[3]
+    alpha3.cand <- rnorm(1, alpha[3], tune[12])
     # create resistance surface
-    cost <- exp(alpha.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])
-    ## calculate conductances among neighbors
+    cost <- exp(alpha[1]*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha3.cand*r_covs[[3]])
+    # calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
-    # calculate least cost distance between all pairs of sites.
-    D.cand <- costDistance(tr1CorrC,x[i,],as.matrix(x.list[[i]]))/1000 #calculate the ecological distance matrix
-    G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2))
+    # calculate the ecological distance matrix in parallel
+    D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, disp_dist, n.cores)/1000
+    G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's are distances that were too far to colonize
+    G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
+    z[,1] <- rbinom(nsite, 1, psi[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi[,k], log=TRUE)
     }
     # priors
     prior.alpha3.cand <- dnorm(alpha3.cand, 0, 10, log=TRUE)
@@ -262,159 +275,190 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       D <- D.cand
       G <- G.cand
       gamma <- gamma.cand
-      psi <- psi.cand
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
-      }
+    }
 
-    # Metropolis update for g0 - part of gamma0 linear model
-    g0.cand <- rnorm(1, b0, tune[12])
-    gamma0.cand <- plogis(g0.cand + g[1]*site_covs[,"size"] + g[2]*site_covs[,"park"] + g[3]*site_covs[,"cem"] + g[4]*site_covs[,"golf"])
+    ## Metropolis update for b0.gam - part of gamma0 linear model
+    b0.gam.cand <- rnorm(1, b0.gam, tune[12])
+    gamma0.cand <- plogis(b0.gam.cand + b.gam[1]*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
     G.cand <- gamma0.cand*exp(-D.cand^2/(2*sigma^2))
+    G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
+    z[,1] <- rbinom(nsite, 1, psi[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi[,k], log=TRUE)
     }
     # priors
-    prior.g0.cand <- dnorm(g0.cand, 0, 10, log=TRUE)
-    prior.g0 <- dnorm(g0, 0, 10, log=TRUE)
+    prior.b0.gam.cand <- dnorm(b0.gam.cand, 0, 10, log=TRUE)
+    prior.b0.gam <- dnorm(b0.gam, 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.g0.cand) -
-                      (ll.z.sum + prior.g0))) {
-      g0 <- g0.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b0.gam.cand) -
+                      (ll.z.sum + prior.b0.gam))) {
+      b0.gam <- b0.gam.cand
       D <- D.cand
       gamma0 <- gamma0.cand
       G <- G.cand
       gamma <- gamma.cand
-      psi <- psi.cand
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
     
-    # Metropolis update for g[1] - part of gamma0 linear model
-    g1.cand <- rnorm(1, g[1], tune[12])
-    gamma0.cand <- plogis(g0 + g1.cand*site_covs[,"size"] + g[2]*site_covs[,"park"] + g[3]*site_covs[,"cem"] + g[4]*site_covs[,"golf"])
+    ## Metropolis update for b.gam[1] - part of gamma0 linear model
+    b1.gam.cand <- rnorm(1, b.gam[1], tune[12])
+    gamma0.cand <- plogis(b0.gam + b1.gam.cand*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
     G.cand <- gamma0.cand*exp(-D.cand^2/(2*sigma^2))
+    G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
+    z[,1] <- rbinom(nsite, 1, psi[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi[,k], log=TRUE)
     }
     # priors
-    prior.g1.cand <- dnorm(g1.cand, 0, 10, log=TRUE)
-    prior.g1 <- dnorm(g[1], 0, 10, log=TRUE)
+    prior.b1.gam.cand <- dnorm(b1.gam.cand, 0, 10, log=TRUE)
+    prior.b1.gam <- dnorm(b.gam[1], 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.g1.cand) -
-                      (ll.z.sum + prior.g1))) {
-      g[1] <- g1.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b1.gam.cand) -
+                      (ll.z.sum + prior.b1.gam))) {
+      b.gam[1] <- b1.gam.cand
       D <- D.cand
       gamma0 <- gamma0.cand
       G <- G.cand
       gamma <- gamma.cand
-      psi <- psi.cand
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
     
-    # Metropolis update for g[2] - part of gamma0 linear model
-    g2.cand <- rnorm(1, g[2], tune[12])
-    gamma0.cand <- plogis(g0 + g[1]*site_covs[,"size"] + g2.cand*site_covs[,"park"] + g[3]*site_covs[,"cem"] + g[4]*site_covs[,"golf"])
+    ## Metropolis update for b.gam[2] - part of gamma0 linear model
+    b2.gam.cand <- rnorm(1, b.gam[2], tune[12])
+    gamma0.cand <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + b2.gam.cand*site_covs[,"park"] + b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
     G.cand <- gamma0.cand*exp(-D.cand^2/(2*sigma^2))
+    G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
+    z[,1] <- rbinom(nsite, 1, psi[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi[,k], log=TRUE)
     }
     # priors
-    prior.g2.cand <- dnorm(g2.cand, 0, 10, log=TRUE)
-    prior.g2 <- dnorm(g[2], 0, 10, log=TRUE)
+    prior.b2.gam.cand <- dnorm(b2.gam.cand, 0, 10, log=TRUE)
+    prior.b2.gam <- dnorm(b.gam[2], 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.g2.cand) -
-                      (ll.z.sum + prior.g2))) {
-      g[2] <- g2.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b1.gam.cand) -
+                      (ll.z.sum + prior.b1.gam))) {
+      b.gam[2] <- b2.gam.cand
       D <- D.cand
       gamma0 <- gamma0.cand
       G <- G.cand
       gamma <- gamma.cand
-      psi <- psi.cand
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
     
-    # Metropolis update for g[3] - part of gamma0 linear model
-    g3.cand <- rnorm(1, g[3], tune[12])
-    gamma0.cand <- plogis(g0 + g[1]*site_covs[,"size"] + g[2]*site_covs[,"park"] + g3.cand*site_covs[,"cem"] + g[4]*site_covs[,"golf"])
+    ## Metropolis update for b.gam[3] - part of gamma0 linear model
+    b3.gam.cand <- rnorm(1, b.gam[3], tune[12])
+    gamma0.cand <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + b3.gam.cand*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
     G.cand <- gamma0.cand*exp(-D.cand^2/(2*sigma^2))
+    G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
+    z[,1] <- rbinom(nsite, 1, psi[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi[,k], log=TRUE)
     }
     # priors
-    prior.g3.cand <- dnorm(g3.cand, 0, 10, log=TRUE)
-    prior.g3 <- dnorm(g[3], 0, 10, log=TRUE)
+    prior.b3.gam.cand <- dnorm(b3.gam.cand, 0, 10, log=TRUE)
+    prior.b3.gam <- dnorm(b.gam[3], 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.g3.cand) -
-                      (ll.z.sum + prior.g3))) {
-      g[3] <- g3.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b3.gam.cand) -
+                      (ll.z.sum + prior.b3.gam))) {
+      b.gam[3] <- b3.gam.cand
       D <- D.cand
       gamma0 <- gamma0.cand
       G <- G.cand
       gamma <- gamma.cand
-      psi <- psi.cand
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
     
-    # Metropolis update for g[4] - part of gamma0 linear model
-    g4.cand <- rnorm(1, g[4], tune[12])
-    gamma0.cand <- plogis(g0 + g[1]*site_covs[,"size"] + g[2]*site_covs[,"park"] + g[3]*site_covs[,"cem"] + g4.cand*site_covs[,"golf"])
+    ## Metropolis update for b.gam[4] - part of gamma0 linear model
+    b4.gam.cand <- rnorm(1, b.gam[4], tune[12])
+    gamma0.cand <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + b.gam[3]*site_covs[,"cem"] + b4.gam.cand*site_covs[,"golf"])
     G.cand <- gamma0.cand*exp(-D.cand^2/(2*sigma^2))
+    G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
+    z[,1] <- rbinom(nsite, 1, psi[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi[,k], log=TRUE)
     }
     # priors
-    prior.g4.cand <- dnorm(g4.cand, 0, 10, log=TRUE)
-    prior.g4 <- dnorm(g[4], 0, 10, log=TRUE)
+    prior.b4.gam.cand <- dnorm(b4.gam.cand, 0, 10, log=TRUE)
+    prior.b4.gam <- dnorm(b.gam[4], 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.g4.cand) -
-                      (ll.z.sum + prior.g4))) {
-      g[4] <- g4.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b4.gam.cand) -
+                      (ll.z.sum + prior.b4.gam))) {
+      b.gam[4] <- b4.gam.cand
       D <- D.cand
       gamma0 <- gamma0.cand
       G <- G.cand
       gamma <- gamma.cand
-      psi <- psi.cand
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
     
-    # Metropolis update for sigma
+    ## Metropolis update for sigma
     sigma.cand <- abs(rnorm(1, sigma, tune[1]))
     G.cand <- gamma0.cand*exp(-D^2/(2*sigma.cand^2))
+    G.cand[is.na(G.cand)] <- 0 # change NA's to 0
+    # model
+    z[,1] <- rbinom(nsite, 1, psi[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi[,k], log=TRUE)
     }
     # priors
     prior.sigma.cand <- dgamma(sigma.cand, 0.001, 0.001)
@@ -428,355 +472,500 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       gamma <- gamma.cand 
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
-      muz <- muz.cand
+      psi <- psi.cand
       G <- G.cand
-      }
+    }
     
-    # Metropolis update for e0 - part of the linear predictor for epsilon
-    e0.cand <- rnorm(1, e0, tune[12])
-    epsilon.cand <- plogis(e0.cand + e[1]*site_covs[,"tree"] + e[2]*site_covs[,"total_veg"] + e[3]*site_covs[,"size"] + e[4]*site_covs[,"pop10"] +
-                        e[5]*site_covs[,"water"] + e[6]*site_covs[,"park"] + e[7]*site_covs[,"cem"] + e[8]*site_covs[,"golf"])
+    ## Metropolis update for b0.psi1 - part of linear predictor for initial occupancy
+    b0.psi1.cand <- rnorm(1, b0.psi1, tune[12])
+    # model
+    psi1.cand <- plogis(b0.psi1.cand + b.psi1[1]*site_covs[,"park"] + b.psi1[2]*site_covs[,"cem"] + b.psi1[3]*site_covs[,"golf"])
+    psi.cand[,1] <- psi1.cand
+    z[,1] <- rbinom(nsite, 1, psi.cand[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
-      gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
-    prior.e0.cand <- dnorm(e0.cand, 0, 10, log=TRUE)
-    prior.e0 <- dnorm(e0, 0, 10, log=TRUE)
+    prior.b0.psi1.cand <- dnorm(b0.psi1.cand, 0, 10, log=TRUE)
+    prior.b0.psi1 <- dnorm(b0.psi1, 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.e0.cand) -
-                      (ll.z.sum + prior.e0))) {
-      e0 <- e0.cand
-      epsilon <- epsilon.cand
-      gamma <- gamma.cand 
+    if(runif(1) < exp((ll.z.sum.cand + prior.b0.psi1.cand) -
+                      (ll.z.sum + prior.b0.psi1))) {
+      b0.psi1 <- b0.psi1.cand
+      psi1 <- psi1.cand
+      psi <- psi.cand
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
-      muz <- muz.cand
-      G <- G.cand
+    }
+    
+    ## Metropolis update for b.psi1[1] - part of linear predictor for initial occupancy
+    b1.psi1.cand <- rnorm(1, b.psi1[1], tune[12])
+    # model
+    psi1.cand <- plogis(b0.psi1 + b1.psi1.cand*site_covs[,"park"] + b.psi1[2]*site_covs[,"cem"] + b.psi1[3]*site_covs[,"golf"])
+    psi.cand[,1] <- psi1.cand
+    z[,1] <- rbinom(nsite, 1, psi.cand[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
+    for(k in 2:nseason) {
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
+    }
+    # priors
+    prior.b1.psi1.cand <- dnorm(b1.psi1.cand, 0, 10, log=TRUE)
+    prior.b1.psi1 <- dnorm(b.psi1[1], 0, 10, log=TRUE)
+    # update
+    ll.z.sum.cand <- sum(ll.z.cand)
+    if(runif(1) < exp((ll.z.sum.cand + prior.b1.psi1.cand) -
+                      (ll.z.sum + prior.b1.psi1))) {
+      b.psi1[1] <- b1.psi1.cand
+      psi1 <- psi1.cand
+      psi <- psi.cand
+      ll.z <- ll.z.cand
+      ll.z.sum <- ll.z.sum.cand
+    }
+    
+    ## Metropolis update for b.psi1[2] - part of linear predictor for initial occupancy
+    b2.psi1.cand <- rnorm(1, b.psi1[2], tune[12])
+    # model
+    psi1.cand <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] + b2.psi1.cand*site_covs[,"cem"] + b.psi1[3]*site_covs[,"golf"])
+    psi.cand[,1] <- psi1.cand
+    z[,1] <- rbinom(nsite, 1, psi.cand[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
+    for(k in 2:nseason) {
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
+    }
+    # priors
+    prior.b2.psi1.cand <- dnorm(b2.psi1.cand, 0, 10, log=TRUE)
+    prior.b2.psi1 <- dnorm(b.psi1[2], 0, 10, log=TRUE)
+    # update
+    ll.z.sum.cand <- sum(ll.z.cand)
+    if(runif(1) < exp((ll.z.sum.cand + prior.b2.psi1.cand) -
+                      (ll.z.sum + prior.b2.psi1))) {
+      b.psi1[2] <- b2.psi1.cand
+      psi1 <- psi1.cand
+      psi <- psi.cand
+      ll.z <- ll.z.cand
+      ll.z.sum <- ll.z.sum.cand
+    }
+    
+    ## Metropolis update for b.psi1[3] - part of linear predictor for initial occupancy
+    b3.psi1.cand <- rnorm(1, b.psi1[3], tune[12])
+    # model
+    psi1.cand <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] + b.psi1[2]*site_covs[,"cem"] + b3.psi1.cand*site_covs[,"golf"])
+    psi.cand[,1] <- psi1.cand
+    z[,1] <- rbinom(nsite, 1, psi.cand[,1])
+    z[which(anyDetections[,1] == 1),1] <- 1
+    ll.z[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
+    for(k in 2:nseason) {
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
+    }
+    # priors
+    prior.b3.psi1.cand <- dnorm(b3.psi1.cand, 0, 10, log=TRUE)
+    prior.b3.psi1 <- dnorm(b.psi1[3], 0, 10, log=TRUE)
+    # update
+    ll.z.sum.cand <- sum(ll.z.cand)
+    if(runif(1) < exp((ll.z.sum.cand + prior.b3.psi1.cand) -
+                      (ll.z.sum + prior.b3.psi1))) {
+      b.psi1[3] <- b3.psi1.cand
+      psi1 <- psi1.cand
+      psi <- psi.cand
+      ll.z <- ll.z.cand
+      ll.z.sum <- ll.z.sum.cand
+    }
+    
+    ## Metropolis update for b0.eps - part of the linear predictor for epsilon
+    b0.eps.cand <- rnorm(1, b0.eps, tune[12])
+    epsilon.cand <- plogis(b0.eps.cand + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
+                        b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
+    for(k in 2:nseason) {
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
+    }
+    # priors
+    prior.b0.eps.cand <- dnorm(b0.eps.cand, 0, 10, log=TRUE)
+    prior.b0.eps <- dnorm(b0.eps, 0, 10, log=TRUE)
+    # update
+    ll.z.sum.cand <- sum(ll.z.cand)
+    if(runif(1) < exp((ll.z.sum.cand + prior.b0.eps.cand) -
+                      (ll.z.sum + prior.b0.eps))) {
+      b0.eps <- b0.eps.cand
+      epsilon <- epsilon.cand
+      ll.z <- ll.z.cand
+      ll.z.sum <- ll.z.sum.cand
     }
    
-    # Metropolis update for e1 - part of the linear predictor for epsilon
-    e1.cand <- rnorm(1, e[1], tune[12])
-    epsilon.cand <- plogis(e0 + e1.cand*site_covs[,"tree"] + e[2]*site_covs[,"total_veg"] + e[3]*site_covs[,"size"] + e[4]*site_covs[,"pop10"] +
-                             e[5]*site_covs[,"water"] + e[6]*site_covs[,"park"] + e[7]*site_covs[,"cem"] + e[8]*site_covs[,"golf"])
+    ## Metropolis update for b.eps[1] - part of the linear predictor for epsilon
+    b1.eps.cand <- rnorm(1, b.eps[1], tune[12])
+    epsilon.cand <- plogis(b0.eps + b1.eps.cand*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
+                             b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
     for(k in 2:nseason) {
-      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
-      gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
-    prior.e1.cand <- dnorm(e1.cand, 0, 10, log=TRUE)
-    prior.e1 <- dnorm(e[1], 0, 10, log=TRUE)
+    prior.b1.eps.cand <- dnorm(b1.eps.cand, 0, 10, log=TRUE)
+    prior.b1.eps <- dnorm(b.eps[1], 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.e1.cand) -
-                      (ll.z.sum + prior.e1))) {
-      e[1] <- e1.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b1.eps.cand) -
+                      (ll.z.sum + prior.b1.eps))) {
+      b.eps[1] <- b1.eps.cand
       epsilon <- epsilon.cand
-      gamma <- gamma.cand 
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
-      muz <- muz.cand
-      G <- G.cand
     }
     
-    # Metropolis update for e2 - part of the linear predictor for epsilon
-    e2.cand <- rnorm(1, e[2], tune[12])
-    epsilon.cand <- plogis(e0 + e[1]*site_covs[,"tree"] + e2.cand*site_covs[,"total_veg"] + e[3]*site_covs[,"size"] + e[4]*site_covs[,"pop10"] +
-                             e[5]*site_covs[,"water"] + e[6]*site_covs[,"park"] + e[7]*site_covs[,"cem"] + e[8]*site_covs[,"golf"])
+    ## Metropolis update for b.eps[2] - part of the linear predictor for epsilon
+    b2.eps.cand <- rnorm(1, b.eps[2], tune[12])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b2.eps.cand*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
+                             b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
     for(k in 2:nseason) {
-      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
-      gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
-    prior.e2.cand <- dnorm(e2.cand, 0, 10, log=TRUE)
-    prior.e2 <- dnorm(e[2], 0, 10, log=TRUE)
+    prior.b2.eps.cand <- dnorm(b2.eps.cand, 0, 10, log=TRUE)
+    prior.b2.eps <- dnorm(b.eps[2], 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.e2.cand) -
-                      (ll.z.sum + prior.e2))) {
-      e[2] <- e2.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b2.eps.cand) -
+                      (ll.z.sum + prior.b2.eps))) {
+      b.eps[2] <- b2.eps.cand
       epsilon <- epsilon.cand
-      gamma <- gamma.cand 
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
-      muz <- muz.cand
-      G <- G.cand
     }
     
-    # Metropolis update for e3 - part of the linear predictor for epsilon
-    e3.cand <- rnorm(1, e[3], tune[12])
-    epsilon.cand <- plogis(e0 + e[1]*site_covs[,"tree"] + e[2]*site_covs[,"total_veg"] + e3.cand*site_covs[,"size"] + e[4]*site_covs[,"pop10"] +
-                             e[5]*site_covs[,"water"] + e[6]*site_covs[,"park"] + e[7]*site_covs[,"cem"] + e[8]*site_covs[,"golf"])
+    ## Metropolis update for b.eps[3] - part of the linear predictor for epsilon
+    b3.eps.cand <- rnorm(1, b.eps[3], tune[12])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b3.eps.cand*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
+                             b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
     for(k in 2:nseason) {
-      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
-      gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
-    prior.e3.cand <- dnorm(e3.cand, 0, 10, log=TRUE)
-    prior.e3 <- dnorm(e[3], 0, 10, log=TRUE)
+    prior.b3.eps.cand <- dnorm(b3.eps.cand, 0, 10, log=TRUE)
+    prior.b3.eps <- dnorm(b.eps[3], 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.e3.cand) -
-                      (ll.z.sum + prior.e3))) {
-      e[3] <- e3.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b3.eps.cand) -
+                      (ll.z.sum + prior.b3.eps))) {
+      b.eps[3] <- b3.eps.cand
       epsilon <- epsilon.cand
-      gamma <- gamma.cand 
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
-      muz <- muz.cand
-      G <- G.cand
     }
     
-    # Metropolis update for e4 - part of the linear predictor for epsilon
-    e4.cand <- rnorm(1, e[4], tune[12])
-    epsilon.cand <- plogis(e0 + e[1]*site_covs[,"tree"] + e[2]*site_covs[,"total_veg"] + e[3]*site_covs[,"size"] + e4.cand*site_covs[,"pop10"] +
-                             e[5]*site_covs[,"water"] + e[6]*site_covs[,"park"] + e[7]*site_covs[,"cem"] + e[8]*site_covs[,"golf"])
+    ## Metropolis update for b.eps[4] - part of the linear predictor for epsilon
+    b4.eps.cand <- rnorm(1, b.eps[4], tune[12])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b4.eps.cand*site_covs[,"pop10"] +
+                             b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
     for(k in 2:nseason) {
-      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
-      gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
-    prior.e4.cand <- dnorm(e4.cand, 0, 10, log=TRUE)
-    prior.e4 <- dnorm(e[4], 0, 10, log=TRUE)
+    prior.b4.eps.cand <- dnorm(b4.eps.cand, 0, 10, log=TRUE)
+    prior.b4.eps <- dnorm(b.eps[4], 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.e4.cand) -
-                      (ll.z.sum + prior.e4))) {
-      e[4] <- e4.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b4.eps.cand) -
+                      (ll.z.sum + prior.b4.eps))) {
+      b.eps[4] <- b4.eps.cand
       epsilon <- epsilon.cand
-      gamma <- gamma.cand 
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
-      muz <- muz.cand
-      G <- G.cand
     }
     
-    # Metropolis update for e5 - part of the linear predictor for epsilon
-    e5.cand <- rnorm(1, e[5], tune[12])
-    epsilon.cand <- plogis(e0 + e[1]*site_covs[,"tree"] + e[2]*site_covs[,"total_veg"] + e[3]*site_covs[,"size"] + e[4]*site_covs[,"pop10"] +
-                             e5.cand*site_covs[,"water"] + e[6]*site_covs[,"park"] + e[7]*site_covs[,"cem"] + e[8]*site_covs[,"golf"])
+    ## Metropolis update for b.eps[5] - part of the linear predictor for epsilon
+    b5.eps.cand <- rnorm(1, b.eps[5], tune[12])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
+                             b5.eps.cand*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
     for(k in 2:nseason) {
-      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
-      gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
-    prior.e5.cand <- dnorm(e5.cand, 0, 10, log=TRUE)
-    prior.e5 <- dnorm(e[5], 0, 10, log=TRUE)
+    prior.b5.eps.cand <- dnorm(b5.eps.cand, 0, 10, log=TRUE)
+    prior.b5.eps <- dnorm(b.eps[5], 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.e5.cand) -
-                      (ll.z.sum + prior.e5))) {
-      e[5] <- e5.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b5.eps.cand) -
+                      (ll.z.sum + prior.b5.eps))) {
+      b.eps[5] <- b5.eps.cand
       epsilon <- epsilon.cand
-      gamma <- gamma.cand 
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
-      muz <- muz.cand
-      G <- G.cand
     }
 
-    # Metropolis update for e6 - part of the linear predictor for epsilon
-    e6.cand <- rnorm(1, e[6], tune[12])
-    epsilon.cand <- plogis(e0 + e[1]*site_covs[,"tree"] + e[2]*site_covs[,"total_veg"] + e[3]*site_covs[,"size"] + e[4]*site_covs[,"pop10"] +
-                             e[5]*site_covs[,"water"] + e6.cand*site_covs[,"park"] + e[7]*site_covs[,"cem"] + e[8]*site_covs[,"golf"])
+    ## Metropolis update for b.eps[6] - part of the linear predictor for epsilon
+    b6.eps.cand <- rnorm(1, b.eps[6], tune[12])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
+                             b.eps[5]*site_covs[,"water"] + b6.eps.cand*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
     for(k in 2:nseason) {
-      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
-      gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
-    prior.e6.cand <- dnorm(e6.cand, 0, 10, log=TRUE)
-    prior.e6 <- dnorm(e[6], 0, 10, log=TRUE)
+    prior.b6.eps.cand <- dnorm(b6.eps.cand, 0, 10, log=TRUE)
+    prior.b6.eps <- dnorm(b.eps[6], 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.e6.cand) -
-                      (ll.z.sum + prior.e6))) {
-      e[6] <- e6.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b6.eps.cand) -
+                      (ll.z.sum + prior.b6.eps))) {
+      b.eps[6] <- b6.eps.cand
       epsilon <- epsilon.cand
-      gamma <- gamma.cand 
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
-      muz <- muz.cand
-      G <- G.cand
     }
     
-    # Metropolis update for e7 - part of the linear predictor for epsilon
-    e7.cand <- rnorm(1, e[7], tune[12])
-    epsilon.cand <- plogis(e0 + e[1]*site_covs[,"tree"] + e[2]*site_covs[,"total_veg"] + e[3]*site_covs[,"size"] + e[4]*site_covs[,"pop10"] +
-                             e[5]*site_covs[,"water"] + e[6]*site_covs[,"park"] + e7.cand*site_covs[,"cem"] + e[8]*site_covs[,"golf"])
+    ## Metropolis update for b.eps[7] - part of the linear predictor for epsilon
+    b7.eps.cand <- rnorm(1, b.eps[7], tune[12])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
+                             b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b7.eps.cand*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
     for(k in 2:nseason) {
-      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
-      gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
-    prior.e7.cand <- dnorm(e7.cand, 0, 10, log=TRUE)
-    prior.e7 <- dnorm(e[7], 0, 10, log=TRUE)
+    prior.b7.eps.cand <- dnorm(b7.eps.cand, 0, 10, log=TRUE)
+    prior.b7.eps <- dnorm(b.eps[7], 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.e7.cand) -
-                      (ll.z.sum + prior.e7))) {
-      e[7] <- e7.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b7.eps.cand) -
+                      (ll.z.sum + prior.b7.eps))) {
+      b.eps[7] <- b7.eps.cand
       epsilon <- epsilon.cand
-      gamma <- gamma.cand 
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
-      muz <- muz.cand
-      G <- G.cand
     }
     
-    # Metropolis update for e8 - part of the linear predictor for epsilon
-    e8.cand <- rnorm(1, e[8], tune[12])
-    epsilon.cand <- plogis(e0 + e[1]*site_covs[,"tree"] + e[2]*site_covs[,"total_veg"] + e[3]*site_covs[,"size"] + e[4]*site_covs[,"pop10"] +
-                             e[5]*site_covs[,"water"] + e[6]*site_covs[,"park"] + e[7]*site_covs[,"cem"] + e8.cand*site_covs[,"golf"])
+    ## Metropolis update for b.eps[8] - part of the linear predictor for epsilon
+    b8.eps.cand <- rnorm(1, b.eps[8], tune[12])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
+                             b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b8.eps.cand*site_covs[,"golf"])
     for(k in 2:nseason) {
-      zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
-      gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k-1] <- (z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1])
-      ll.z.cand[,k-1] <- dbinom(z[,k], 1, psi.cand[,k-1], log=TRUE)
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      z[,k] <- rbinom(nsite, 1, psi.cand[,k])
+      z[which(anyDetections[,k] == 1),k] <- 1
+      ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
-    prior.e8.cand <- dnorm(e8.cand, 0, 10, log=TRUE)
-    prior.e8 <- dnorm(e[8], 0, 10, log=TRUE)
+    prior.b8.eps.cand <- dnorm(b8.eps.cand, 0, 10, log=TRUE)
+    prior.b8.eps <- dnorm(b.eps[8], 0, 10, log=TRUE)
     # update
     ll.z.sum.cand <- sum(ll.z.cand)
-    if(runif(1) < exp((ll.z.sum.cand + prior.e8.cand) -
-                      (ll.z.sum + prior.e8))) {
-      e[8] <- e8.cand
+    if(runif(1) < exp((ll.z.sum.cand + prior.b8.eps.cand) -
+                      (ll.z.sum + prior.b8.eps))) {
+      b.eps[8] <- b8.eps.cand
       epsilon <- epsilon.cand
-      gamma <- gamma.cand 
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
-      muz <- muz.cand
-      G <- G.cand
     }
     
-    # update z
-    zkup <- rep(0, nseason-1)
-    for(k in 2:nseason) {
-      anyDet <- anyDetections[,k]==1 
-      prop.back <- prop.cand <- 0
-      for(i in 1:nsite) {
-        # z candidate values
-        zk.cand <- z[,k] # grab a vector of z candidates from initial values for each season
-        zk.cand[i] <- 1-z[i,k] # flip each one WHY?
-        # ll. y candidate
-        ll.y.tmp <- ll.y.cand.tmp <- 0
-        if(i <= nsampled & j_mat[i,k] > 0) { # only use sampled sites
-          ll.y.cand.tmp <- dbinom(y[i,k], j_mat[i,k], zk.cand[i]*p[k], log=TRUE)
-          ll.y.tmp <- sum(ll.y[i,k], na.rm=TRUE) # trick to turn all NA's to 0
-          }
-        # prior for z
-        # note from Howell et al (2018) code: Prior must be calculated for time k and k+1 b/c change in z affects both
-        ll.z.cand[i,k-1] <- dbinom(zk.cand[i], 1, psi[i,k-1], log=TRUE)
-        ll.z2 <- ll.z2.cand <- 0
-        if(k < nseason) {
-          zkt.cand <- matrix(zk.cand, nsite, nsite, byrow=TRUE)
-          gamma.cand[,k] <- 1 - exp(rowSums(log(1-G*zkt.cand)))
-          psi.cand[,k] <- (zk.cand*(1-epsilon*(1-gamma.cand[,k])) + (1-zk.cand)*gamma.cand[,k])
-          ll.z.cand[,k] <- dbinom(z[,k+1], 1, psi.cand[,k], log=TRUE)
-          ll.z2 <- sum(ll.z[,k])
-          ll.z2.cand <- sum(ll.z.cand[,k])
-          }
-        if(runif(1) < exp((sum(ll.y.cand.tmp, na.rm=TRUE) + ll.z.cand[i,k-1] + ll.z2.cand + prop.back) -
-                          (ll.y.tmp + ll.z[i,k-1] + ll.z2 + prop.cand))) {
-          z[,k] <- zk.cand
-          ll.z[i,k-1] <- ll.z.cand[i,k-1]
-          if(k < nseason) {
-            gamma[,k] <- gamma.cand[,k]
-            psi[,k] <- psi.cand[,k]
-            ll.z[,k] <- ll.z.cand[,k]
-            }
-          if(i <= nsampled & j_mat[i,k] > 0) {
-            ll.y[i,k] <- ll.y.cand.tmp
-            }
-          zkup[k-1] <- zkup[k-1] + 1
+    ## Metropolis update for z
+    zkup <- rep(0, nseason)
+    zknown1 <- anyDetections[,1]==1
+    zknown1[is.na(zknown1)] <- 0
+    # update for seasons 1
+    for(i in 1:nsite){
+      if(zknown1[i]) next # only estimate sites where we did not detect the species
+      z1.cand <- z[,1]
+      z1.cand[i] <- 1-z[i,1]
+      ll.y1.tmp <- ll.y1.cand.tmp <- 0
+      if(i <= nsampled & j_mat[i,1] > 0) { # only use sampled sites
+        ll.y1.cand.tmp <- dbinom(y[i,1], j_mat[i,1], z1.cand[i]*p[1], log=TRUE)
+        ll.y1.tmp <- sum(ll.y[i,1], na.rm=TRUE) # trick to turn all NA's to 0
         }
+      ll.z1.cand <- dbinom(z1.cand[i], 1, psi[i,1], log=TRUE)
+      ll.z1.tmp <- sum(ll.z[i,1], na.rm=TRUE)
+      # proposal
+      if(runif(1) < exp((sum(ll.y1.cand.tmp, na.rm=TRUE) + ll.z1.cand) -
+                        (ll.y1.tmp + ll.z1.tmp))) {
+        z[,1] <- z1.cand
+        ll.z[i,1] <- ll.z1.cand
+        if(i <= nsampled & j_mat[i,1] > 0) {
+          ll.y[i,1] <- ll.y1.cand.tmp
+        }
+        zkup[1] <- zkup[1] + 1
       }
     }
+    # update for seasons k+1
+    for(k in 2:nseason) {
+      zknown <- anyDetections[,k]==1
+      zknown[is.na(zknown)] <- 0
+        for(i in 1:nsite) {
+          if(zknown[i]) next
+          # z candidate values
+          zk.cand <- z[,k] # grab a vector of z candidates from initial values for each season
+          zk.cand[i] <- 1-z[i,k] # if we give it the oppposite does that decrease or increase the likelihood?
+          # ll.y candidate
+          ll.y.tmp <- ll.y.cand.tmp <- 0
+          if(i <= nsampled & j_mat[i,k] > 0) { # only use sampled sites
+            ll.y.cand.tmp <- dbinom(y[i,k], j_mat[i,k], zk.cand[i]*p[k], log=TRUE)
+            ll.y.tmp <- sum(ll.y[i,k], na.rm=TRUE) # trick to turn all NA's to 0
+            }
+          # prior for z
+          # note from Howell et al (2018) code: Prior must be calculated for time k and k+1 b/c change in z affects both
+          ll.z.cand[i,k] <- dbinom(zk.cand[i], 1, psi[i,k], log=TRUE)
+          ll.z2 <- ll.z2.cand <- 0
+          if(k < nseason) {
+            zkt.cand <- matrix(zk.cand, nsite, nsite, byrow=TRUE)
+            gamma.cand[,k] <- 1 - exp(rowSums(log(1-G*zkt.cand)))
+            psi.cand[,k] <- (zk.cand*(1-epsilon.cand*(1-gamma.cand[,k])) + (1-zk.cand)*gamma.cand[,k])
+            ll.z.cand[,k+1] <- dbinom(z[,k+1], 1, psi.cand[,k+1], log=TRUE)
+            ll.z2 <- sum(ll.z[,k+1])
+            ll.z2.cand <- sum(ll.z.cand[,k+1])
+            }
+          if(runif(1) < exp((sum(ll.y.cand.tmp, na.rm=TRUE) + ll.z.cand[i,k] + ll.z2.cand) -
+                           (ll.y.tmp + ll.z[i,k] + ll.z2))) {
+            z[,k] <- zk.cand
+            ll.z[i,k] <- ll.z.cand[i,k]
+            if(k < nseason) {
+              gamma[,k] <- gamma.cand[,k]
+              psi[,k] <- psi.cand[,k]
+              ll.z[,k] <- ll.z.cand[,k]
+              }
+            if(i <= nsampled & j_mat[i,k] > 0) {
+              ll.y[i,k] <- ll.y.cand.tmp
+              }
+            zkup[k] <- zkup[k] + 1
+          }
+        }
+      }
     
     nz1 <- nz1+z
     
-    #Update for beta0
-    beta0.cand<-rnorm(1, beta0, tune[8])
-    p.cand <- plogis(beta0.cand + beta1*p.cov1 + beta2*p.cov2)
-    z.wide <- z[,rep(1:nYears, each=nReps)]
-    z.a <- array(z.wide, c(nSites, nReps, nYears))
+    ## Metropolis update for a0 - part of detection probability
+    a0.cand<-rnorm(1, a0, 0.2)
+    p.cand <- plogis(a0.cand + season[season_vec])
+    p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
+    p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
 
-    ll.y[,,dataYears] <- dbinom(y[,,dataYears], 1, z.a[1:nSampled,,dataYears]*p[,,dataYears], log=TRUE)
-    ll.y.cand[,,dataYears] <- dbinom(y[,,dataYears], 1, z.a[1:nSampled,,dataYears]*p.cand[,,dataYears], log=TRUE)
-    prior.beta0.cand <- dnorm(beta0.cand, 0, 10, log=TRUE) 
-    prior.beta0 <- dnorm(beta0, 0, 10, log=TRUE)
+    ll.y <- dbinom(y, j, z[1:nsampled,]*p.mat, log=TRUE)
+    ll.y.cand <- dbinom(y, j, z[1:nsampled,]*p.cand.mat, log=TRUE)
+    # priors
+    prior.a0.cand <- dnorm(a0.cand, 0, 10, log=TRUE) 
+    prior.a0 <- dnorm(a0, 0, 10, log=TRUE)
 
     ll.y.sum <- sum(ll.y, na.rm=TRUE)
     ll.y.sum.cand <- sum(ll.y.cand, na.rm=TRUE)
-    if(runif(1) < exp((ll.y.sum.cand + prior.beta0.cand) -
-                      (ll.y.sum + prior.beta0))) {
-        beta0 <- beta0.cand
+    if(runif(1) < exp((ll.y.sum.cand + prior.a0.cand) -
+                      (ll.y.sum + prior.a0))) {
+        a0 <- a0.cand
         p <- p.cand
         ll.y <- ll.y.cand
         ll.y.sum <- ll.y.sum.cand
     }
 
-    #Update for beta1
-    beta1.cand<-rnorm(1, beta1, tune[9])
-    p.cand <- plogis(beta0 + beta1.cand*p.cov1 + beta2*p.cov2)
-    z.wide <- z[,rep(1:nYears, each=nReps)]
-    z.a <- array(z.wide, c(nSites, nReps, nYears))
-
-    ll.y.cand[,,dataYears] <- dbinom(y[,,dataYears], 1, z.a[1:nSampled,,dataYears]*p.cand[,,dataYears], log=TRUE)
-    prior.beta1.cand <- dnorm(beta1.cand, 0, 10, log=TRUE) 
-    prior.beta1 <- dnorm(beta1, 0, 10, log=TRUE)
-
+    #Update for season 2
+    season2.cand.vec <- season
+    season2.cand.vec[2] <- rnorm(1, season[2], tune[9])
+    p.cand <- plogis(a0 + season2.cand.vec[season_vec])
+    p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
+    p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
+    
+    ll.y <- dbinom(y, j, z[1:nsampled,]*p.mat, log=TRUE)
+    ll.y.cand <- dbinom(y, j, z[1:nsampled,]*p.cand.mat, log=TRUE)
+    # priors
+    prior.season2.cand <- dnorm(season2.cand.vec[2], 0, 10, log=TRUE) 
+    prior.season2 <- dnorm(season[2], 0, 10, log=TRUE)
+    
+    ll.y.sum <- sum(ll.y, na.rm=TRUE)
     ll.y.sum.cand <- sum(ll.y.cand, na.rm=TRUE)
-    if(runif(1) < exp((ll.y.sum.cand + prior.beta0.cand) -
-                      (ll.y.sum + prior.beta0))) {
-        beta1 <- beta1.cand
-        p <- p.cand
-        ll.y <- ll.y.cand
-        ll.y.sum <- ll.y.sum.cand
+    if(runif(1) < exp((ll.y.sum.cand + prior.season2.cand) -
+                      (ll.y.sum + prior.season2))) {
+      season <- season2.cand.vec
+      p <- p.cand
+      ll.y <- ll.y.cand
+      ll.y.sum <- ll.y.sum.cand
     }
 
-    #Update for beta2
-    beta2.cand<-rnorm(1, beta2, tune[10])
-    p.cand <- plogis(beta0 + beta1*p.cov1 + beta2.cand*p.cov2)
-    z.wide <- z[,rep(1:nYears, each=nReps)]
-    z.a <- array(z.wide, c(nSites, nReps, nYears))
-
-    ll.y.cand[,,dataYears] <- dbinom(y[,,dataYears], 1, z.a[1:nSampled,,dataYears]*p.cand[,,dataYears], log=TRUE)
-    prior.beta2.cand <- dnorm(beta2.cand, 0, 10, log=TRUE) 
-    prior.beta2 <- dnorm(beta2, 0, 10, log=TRUE)
-
+    # Update for season 3
+    season3.cand.vec <- season
+    season3.cand.vec[3] <- rnorm(1, season[3], tune[9])
+    p.cand <- plogis(a0 + season3.cand.vec[season_vec])
+    p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
+    p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
+    
+    ll.y <- dbinom(y, j, z[1:nsampled,]*p.mat, log=TRUE)
+    ll.y.cand <- dbinom(y, j, z[1:nsampled,]*p.cand.mat, log=TRUE)
+    # priors
+    prior.season3.cand <- dnorm(season3.cand.vec[3], 0, 10, log=TRUE) 
+    prior.season3 <- dnorm(season[3], 0, 10, log=TRUE)
+    
+    ll.y.sum <- sum(ll.y, na.rm=TRUE)
     ll.y.sum.cand <- sum(ll.y.cand, na.rm=TRUE)
-    if(runif(1) < exp((ll.y.sum.cand + prior.beta0.cand) -
-                      (ll.y.sum + prior.beta0))) {
-        beta2 <- beta2.cand
-        p <- p.cand
-        ll.y <- ll.y.cand
-        ll.y.sum <- ll.y.sum.cand
+    if(runif(1) < exp((ll.y.sum.cand + prior.season3.cand) -
+                      (ll.y.sum + prior.season3))) {
+      season <- season3.cand.vec
+      p <- p.cand
+      ll.y <- ll.y.cand
+      ll.y.sum <- ll.y.sum.cand
+    }
+    
+    # Update for season 4
+    season4.cand.vec <- season
+    season4.cand.vec[4] <- rnorm(1, season[4], tune[9])
+    p.cand <- plogis(a0 + season4.cand.vec[season_vec])
+    p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
+    p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
+    
+    ll.y <- dbinom(y, j, z[1:nsampled,]*p.mat, log=TRUE)
+    ll.y.cand <- dbinom(y, j, z[1:nsampled,]*p.cand.mat, log=TRUE)
+    # priors
+    prior.season4.cand <- dnorm(season4.cand.vec[4], 0, 10, log=TRUE) 
+    prior.season4 <- dnorm(season[4], 0, 10, log=TRUE)
+    
+    ll.y.sum <- sum(ll.y, na.rm=TRUE)
+    ll.y.sum.cand <- sum(ll.y.cand, na.rm=TRUE)
+    if(runif(1) < exp((ll.y.sum.cand + prior.season4.cand) -
+                      (ll.y.sum + prior.season4))) {
+      season <- season4.cand.vec
+      p <- p.cand
+      ll.y <- ll.y.cand
+      ll.y.sum <- ll.y.sum.cand
     }
 
     zk <- colSums(z)
+    
 
-    samples[s,] <- c(sigma, gamma0.i, gamma0.s, gamma0.p,
-                     epsilon.i, epsilon.s, epsilon.p,
-                     beta0, beta1, beta2, alpha, zk=zk, deviance=-2*ll.y.sum)
-    zK[,s] <- z[,nYears]
+    samples[s,] <- c(alpha, sigma, b0.gam, b.gam, b0.psi1, 
+                     b.psi1, b0.eps, b.eps, a0, season[2:4], zk=zk, 
+                     deviance=-2*ll.y.sum)
+    zK[,s] <- z[,nseason]
     if(monitor.z)
         zA[,,s] <- z
   }

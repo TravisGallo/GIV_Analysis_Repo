@@ -145,12 +145,17 @@ sitecovs2 <- cbind(tree, total_veg, water, size, pop10, park, golf, cem)
 
 x <- coords
 y <- y_mat
-j <- j_mat
+j <- as.matrix(j_mat)
 site_covs <- sitecovs2
 obs_covs <- season_vec
 r_covs <- res_covs
 disp_dist <- 10000
 n.cores <- 4
+iters <- 5
+report <- 10
+monitor.z <- TRUE
+plot.z <- TRUE
+tune <- rgamma(12,1,1)
 
 plot(coords)
 
