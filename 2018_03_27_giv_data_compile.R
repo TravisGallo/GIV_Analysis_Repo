@@ -350,19 +350,6 @@ writeRaster(pop40_raster, "CMAP_PHH40", format = "GTiff")
 save.image("2018-04-12_GIV_Workspace.RData")
 
 ######## HARD HAT AREA - PROCEED WITH CAUTION ###############
-
-r <- raster(nrow=4,ncol=8)
-
-r2 <- raster(nrow=2,ncol=4)
-
-r <- setValues(r,values = 1:32)
-
-r_agg <- aggregate(r,fact=2,fun=mean)
-
-r_resam <- resample(r,r2,method='bilinear')
-
-values(r_resam) == values(r_agg)
-
-
-values(r_resam)
-## [1]  5.5  7.5  9.5 11.5 21.5 23.5 25.5 27.5
+hmm <- rnorm(1e6, 0, 1.5)
+plot(density(hmm))
+plot(density(plogis(hmm)))

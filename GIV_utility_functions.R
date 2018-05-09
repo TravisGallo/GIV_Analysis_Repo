@@ -149,7 +149,7 @@ costDistance_mod <- function(x, fromCoords, toCoords, dist.cutoff, n.cores) {
   }
   
   # make the transition matrix an object that igraph can read
-  y <- gdistance::transitionMatrix(tr1CorrC)
+  y <- gdistance::transitionMatrix(x)
   # create an adjacencyGraph to get edge weights
   if(isSymmetric(y)) {m <- "undirected"} else{m <- "directed"}
   adjacencyGraph <- graph.adjacency(y, mode=m, weighted=TRUE)
@@ -170,6 +170,43 @@ costDistance_mod <- function(x, fromCoords, toCoords, dist.cutoff, n.cores) {
   D_mat <- matrix(NA, nrow(fromCoords), nrow(fromCoords))
   for(i in 1:nrow(fromCoords)){
     D_mat[toCoords.loc[[i]],i] <- costDist[[i]]
+  }
+  rownames(D_mat) <- rownames(fromCoords)
+  colnames(D_mat) <- rownames(fromCoords)
+  
+  return(D_mat)
+}
+
+### modification to costDistance function to run parrallel but use all sites ###
+
+costDistance_mod2 <- function(x, fromCoords, toCoords, n.cores) {
+  
+  # indicates which cells the fromCoords are in
+  fromCells <- cellFromXY(x, fromCoords)
+  toCells <- cellFromXY(x, toCoords)
+  
+  # make the transition matrix an object that igraph can read
+  y <- gdistance::transitionMatrix(x)
+  # create an adjacencyGraph to get edge weights
+  if(isSymmetric(y)) {m <- "undirected"} else{m <- "directed"}
+  adjacencyGraph <- graph.adjacency(y, mode=m, weighted=TRUE)
+  # reclassify edge weights as cost
+  E(adjacencyGraph)$weight <- 1/E(adjacencyGraph)$weight
+  
+  # parallel through each fromCell and its respective list of toCells
+  cl <- makeCluster(n.cores) # setup parallel backend to use x number of cores
+  registerDoParallel(cl) # register backend
+  costDist <- foreach(i=1:length(fromCells), .packages=c("gdistance")) %dopar% {
+    shortestPaths <- shortest.paths(adjacencyGraph, v=fromCells[i], to=toCells, mode="out", algorithm="dijkstra")
+    rownames(shortestPaths) <- rownames(fromCoords)[i]
+    colnames(shortestPaths) <- rownames(toCoords)
+    return(shortestPaths)
+  }
+  stopCluster(cl) #stop cluster
+  
+  D_mat <- matrix(NA, nrow(fromCoords), nrow(fromCoords))
+  for(i in 1:nrow(fromCoords)){
+    D_mat[toCoords,i] <- costDist[[i]]
   }
   rownames(D_mat) <- rownames(fromCoords)
   colnames(D_mat) <- rownames(fromCoords)

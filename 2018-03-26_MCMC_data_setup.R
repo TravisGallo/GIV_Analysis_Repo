@@ -22,7 +22,7 @@ sites_names <- as.character(full_site_names[-c(20,23,70,94,96)])
 z_mat <- df_2_array(read.table("./Data/z_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
 # build y-array and j-matrix
 y_mat <- df_2_array(read.table("./Data/y_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
-j_mat <- read.table("./Data/j_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t")[-c(20,23,70,94,96),-c(1,2)]
+j_mat <- as.matrix(read.table("./Data/j_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[-c(20,23,70,94,96),-c(1,2)]
 
 # take a look at the raw data
 sum(y_mat, na.rm=TRUE) # Total dets
@@ -145,17 +145,22 @@ sitecovs2 <- cbind(tree, total_veg, water, size, pop10, park, golf, cem)
 
 x <- coords
 y <- y_mat
-j <- as.matrix(j_mat)
+j <- j_mat
 site_covs <- sitecovs2
 obs_covs <- season_vec
 r_covs <- res_covs
-disp_dist <- 10000
+disp_dist <- 100000
 n.cores <- 4
 iters <- 5
 report <- 10
 monitor.z <- TRUE
 plot.z <- TRUE
-tune <- rgamma(12,1,1)
+# tune order (alpha[1], alpha[2], alpha[3], b0.gam, b.gam[1], b.gam[2], b.gam[3], b.gam[4], sigma, b0.psi1, b.psi1[1], b.psi1[2], b.psi1[3],
+# b0.eps, b.eps[1], b.eps[2], b.eps[3], b.eps[4], b.eps[5], b.eps[6], b.eps[7], b.eps[8], a0, season[2], season[3], season[4]
+tune <- c(0.3, 0.3, 0.3, 1, 1, 1, 1, 1, 0.3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+
+length(tune)
+
 
 plot(coords)
 
