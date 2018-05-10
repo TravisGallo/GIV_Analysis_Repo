@@ -1,28 +1,38 @@
 #######################################################################################
-#Spatial Occupancy Model for COYOTE. Written by Travis Gallo and Mason Fidino
-#Modified from Paige Howell, Richard Chandler
+# Spatial Occupancy Model for COYOTE. Written by Travis Gallo and Mason Fidino
+#  Modified from Paige Howell, Richard Chandler
 #######################################################################################
 
-# load internal functions
+# load internal functions. Assumes this script is in your working directory.
 source("GIV_utility_functions.R")
 
-#load patch-level covariate data
+# load patch-level covariate data
 covs <- readRDS("./Data/2018-03-27_patch_covariates.RDS")
-# order covariates so the sampled sites are in the same order as detection data frames
-# rows 1-98 are sampled sites and data is in the same order as y, z, and j matrices (even though Station.ID does not match perfectly)
+
+# Order covariates so the sampled sites are in the same order as detection data
+#  frames. Rows 1-98 are sampled sites and data is in the same order as y, z, 
+#  and j matrices (even though Station.ID does not match perfectly)
 covs <- covs[order(covs$Station.ID),]
 
 # observation and sampling data
-full_site_names <- read.table("./Data/sites_used_in_sp10_sp13_analysis_6_1_17.txt", header = TRUE)[,1]
+full_site_names <- 
+  read.table("./Data/sites_used_in_sp10_sp13_analysis_6_1_17.txt", 
+             header = TRUE)[,1]
+
 full_site_names[!full_site_names %in% covs$Station.ID] # see the mismatch
+
 # randomly chose 1 site for patches that had multiple sites. Remove unused sites
 sites_names <- as.character(full_site_names[-c(20,23,70,94,96)])
 
 # load species specific data - remove sites that we do not use in this analysis
 z_mat <- df_2_array(read.table("./Data/z_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
-# build y-array and j-matrix
-y_mat <- df_2_array(read.table("./Data/y_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
-j_mat <- as.matrix(read.table("./Data/j_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[-c(20,23,70,94,96),-c(1,2)]
+
+# build y-array (detection) and j-matrix (n days sampled)
+y_mat <- df_2_array(read.table("./Data/y_matrix_sp10_sp13_6_1_17.txt", 
+                    header = TRUE, sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
+
+j_mat <- as.matrix(read.table("./Data/j_matrix_sp10_sp13_6_1_17.txt", 
+                   header = TRUE, sep = "\t"))[-c(20,23,70,94,96),-c(1,2)]
 
 # take a look at the raw data
 sum(y_mat, na.rm=TRUE) # Total dets
@@ -32,13 +42,18 @@ sum(rowSums(y_mat, na.rm = TRUE) > 0)/nrow(y_mat) # Proportion of sites occupied
 # site coordinates for all sites
 coords <- as.matrix(covs[, c("x","y")])
 
-# site-level covariates
-# site type: 1 = park; 2 = golf course; 3 = cemetery' 4 = natural area/conservation
+# Site-level covariates
+#  site types include: 
+#  1 = park 
+#  2 = golf course
+#  3 = cemetery
+#  4 = natural area/conservation
 type <- covs[,"site_type"]
 park <- golf <- cem <- rep(0, length(type))
 park[which(type == 1)] <- 1
 golf[which(type == 2)] <- 1
-cem[which(type == 3)] <- 1
+cem[which(type == 3)]  <- 1
+
 # tree cover (scaled)
 tree <- (covs[,"patch_tree"] - mean(covs[,"patch_tree"]))/sd(covs[,"patch_tree"])
 # vegetation cover (scaled)
@@ -66,17 +81,19 @@ study_extent <- extent(global_patches) + 5000
 ndvi_res <- crop(raster("./Data/NDVI_to_Resistence.tif"), study_extent)
 ndvi_coarse <- aggregate(ndvi_res, fact=4, fun=mean) # scale up raster to 120x120
 ndvi_scale <- scale(ndvi_coarse)
+
 # 2010 population density raster (scaled)
 pop10_res <- crop(raster("./Data/CMAP_PHH10.tif"), study_extent)
 pop10_coarse <- aggregate(pop10_res, fact=4, fun=mean)
 pop10_scale <- scale(pop10_coarse)
+
 # 2040 population density raster (scaled) - for future projections, not initial model run
 pop40_res <- crop(raster("./Data/CMAP_PHH40.tif"), study_extent)
 pop40_coarse <- aggregate(pop40_res, fact=4, fun=mean)
 pop40_scale <- scale(pop40_coarse)
 
 # interstate raster - ULTIMATELY DID NOT USE INTERSTATES AS A POTENTIAL BARRIER
-#interstate_res <- raster("./Data/Interstate_Resistance.tif")
+# interstate_res <- raster("./Data/Interstate_Resistance.tif")
 # give resistence a really high value but a non-zero probability of crossing
 #to_replace <- values(interstate_coarse) == 1
 #values(interstate_coarse)[to_replace] <- max(values(ndvi_scale), na.rm=TRUE) + max(values(pop10_scale), na.rm=TRUE)
@@ -107,12 +124,14 @@ res_covs <- as.list(c(ndvi=ndvi_scale, pop=pop10_scale, patch=patch_indicator))
 
 # creat small space to test
 test_extent <- extent(sites_sampled) + 2000
+
 # crop raster and patches shape for practice
 ndvi_crop <- crop(ndvi_scale, test_extent)
 patch_crop <- crop(patch_indicator, test_extent)
 pop_crop <- crop(pop10_scale, test_extent)
 #interstate_crop <- crop(interstate_res_extend, test_extent)
 global_patches_crop <- crop(global_patches, test_extent)
+
 # list of resistence covariates
 res_covs <- as.list(c(ndvi_crop, pop_crop, patch_crop))
 
