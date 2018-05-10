@@ -34,14 +34,18 @@ df_2_array <- function(my_df = NULL){
 
 #### function to intersect background data layer (vector) with buffer layers (vector) and calculate needed data ###
 # layer 1 should be the input layer with data to extract, layer 2 is the intersecting layer
-getIntersect <- function(layer1, layer2, columnName, getMean=FALSE, getLength=FALSE, getArea=FALSE, n.cores){
+getIntersect <- function(layer1, layer2, columnName, getMean=FALSE, 
+                         getLength=FALSE, getArea=FALSE, n.cores){
   
   # set and register cores
-  cl <- makeCluster(n.cores) #set number of cores
-  registerDoParallel(cl) # register backend
+  cl <- makeCluster(n.cores) # set number of cores
+  registerDoParallel(cl)     # register backend
   
-  # use a foreach loop to parallel and loop through each feature of the buffer layer
-  dat <- foreach(i=1:length(layer2), .combine=c, .packages=c("raster", "dplyr")) %dopar% {
+  # use a foreach loop to parallel and loop through each feature of 
+  #  the buffer layer
+  dat <- foreach(i=1:length(layer2), 
+                 .combine=c, 
+                 .packages=c("raster", "dplyr")) %dopar% {
     # intersect two vector layers - layer1 is the input layer
     buffer_intersect <- raster::intersect(layer1,layer2[i,])
     # loop through each feature and extract the needed data
@@ -49,21 +53,36 @@ getIntersect <- function(layer1, layer2, columnName, getMean=FALSE, getLength=FA
       buffer_intersect <- 0
     } else {
       if(getLength){
-        sum(SpatialLinesLengths(buffer_intersect))
+        buffer_intersect %>% 
+          SpatialLinesLengths(.) %>% 
+          sum(.) %>% 
+          return(.)
       } else {
         if(getArea) {
           data_intersect$area <- raster::area(data_intersect)
           # calculate the areas of each landuse category
-          data_table <- as.data.frame(data_intersect@data %>% 
-                                        group_by_at(vars(one_of(columnName))) %>%
-                                        summarise(total=sum(as.numeric(as.character(area)))))
+          data_table <- data_intersect@data %>% 
+                        group_by_at(vars(one_of(columnName))) %>%
+                        summarise(total=sum(as.numeric(as.character(area)))) %>% 
+                        as.data.frame(.)
           # extract the land use category that has the greatest area
-          as.character(data_table[which(data_table$total == max(data_table$total, na.rm=TRUE)),1])
+          data_table[which(data_table$total == 
+                           max(data_table$total, na.rm=TRUE)),1] %>% 
+                     as.character(.) %>% 
+                     return(.)
         } else {
           if(getMean){
-            mean(as.numeric(as.character((buffer_intersect@data[,columnName]))))
+            buffer_intersect@data[,columnName] %>% 
+              as.character(.) %>% 
+              as.numeric(.) %>% 
+              mean(.) %>% 
+              return(.)
           } else {
-            sum(as.numeric(as.character((buffer_intersect@data[,columnName]))))
+            buffer_intersect@data[,columnName] %>% 
+              as.character(.) %>% 
+              as.numeric(.) %>% 
+              sum(.) %>% 
+              return(.)
           }
         }
       }

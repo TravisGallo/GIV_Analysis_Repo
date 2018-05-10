@@ -32,11 +32,12 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   
   ## initial values for sampler
   # resistence
-  alpha <- rnorm(3, 0, 0.2)
+  alpha <-   rnorm(3, 0, 0.2)
   # initial occupancy
-  b0.psi1 <- rnorm(1,0,0.5)
-  b.psi1 <- rnorm(3,0,0.5)
+  b0.psi1 <- rnorm(1, 0, 0.5)
+  b.psi1 <-  rnorm(3, 0, 0.5)
   # colonization
+<<<<<<< HEAD
   b0.gam <- rnorm(1,0,0.5) # intercept
   b.gam <- rnorm(4,0,0.5) # 4 covariates
   gamma0 <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + 
@@ -49,39 +50,91 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
                     + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
                       b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + 
                       b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
+=======
+  b0.gam <-  rnorm(1, 0, 0.5) # intercept
+  b.gam <-   rnorm(4, 0, 0.5) # 4 covariates
+  gamma0 <-  plogis(b0.gam + b.gam[1]*site_covs[ ,"size"] + 
+                             b.gam[2]*site_covs[ ,"park"] + 
+                             b.gam[3]*site_covs[ ,"cem"]  + 
+                             b.gam[4]*site_covs[ ,"golf"] )
+  sigma <-   runif(1, 1, 10)
+  # extinction
+  b0.eps <-  rnorm(1, 0, 0.5) # intercept
+  b.eps <-   rnorm(8, 0, 0.5) # 8 covariates
+  epsilon <- plogis(b0.eps + b.eps[1]*site_covs[ ,"tree"] + 
+                             b.eps[2]*site_covs[ ,"total_veg"] + 
+                             b.eps[3]*site_covs[ ,"size"] + 
+                             b.eps[4]*site_covs[ ,"pop10"] +
+                             b.eps[5]*site_covs[ ,"water"] +
+                             b.eps[6]*site_covs[ ,"park"] +
+                             b.eps[7]*site_covs[ ,"cem"] +
+                             b.eps[8]*site_covs[ ,"golf"] )
+>>>>>>> 1575259331040de897072e1008ceeb0409aeccb8
   # detection
   p <- rep(0, nseason)
-  a0 <- rnorm(1,0,0.5)
-  season <- rnorm(4,0,0.5)
+  a0 <- rnorm(1, 0, 0.5)
+  season <- rnorm(4,0 , 0.5)
   season[1] <- 0
   p <- plogis(a0 + season[season_vec])
   # need to run through the model to generate starting values for z[,k-1] based off z[,1] starting values,
   # psi, gamma, and likelihoods for z and y
   gamma <- matrix(NA, nsite, nseason-1)
   psi1 <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] + 
+<<<<<<< HEAD
                    b.psi1[2]*site_covs[,"cem"] + b.psi1[3]*site_covs[,"golf"])
+=======
+                           b.psi1[2]*site_covs[,"cem"]  +
+                           b.psi1[3]*site_covs[,"golf"] )
+  
+  # psi matrix holds all occupancy probabilities in t = 1 and then the 
+  #  associated colonization / extinction probabilities at t > 1.
+>>>>>>> 1575259331040de897072e1008ceeb0409aeccb8
   psi <- matrix(NA, nsite, nseason)
+  
+  #  occupancy prob season 1 from initial values
   psi[,1] <- psi1
+  
+  # log likelihood matrices for latent and observed states
   ll.z <- matrix(0, nsite, nseason)
   ll.y <- matrix(0, nsampled, nseason)
+  
   # create resistance surface
-  cost <- exp(alpha[1]*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])
-  # calculate conductances among neighbors
-  # create transition matrix - here we convert our cost to conductance by doing 1/resistence
+  cost <- exp(alpha[1]*r_covs[[1]] + 
+              alpha[2]*r_covs[[2]] + 
+              alpha[3]*r_covs[[3]] )
+  
+  # calculate conductances among neighbors 
+  #  create transition matrix - 
+  #  here we convert our cost to conductance by doing 1/resistance
   tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
+  
   # adjust diag. conductances
-  tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE, scl=FALSE) 
+  tr1CorrC <- geoCorrection(tr1, type="c", multpl = FALSE, scl = FALSE) 
+  
   # calculate the ecological distance matrix in parallel
+<<<<<<< HEAD
+=======
+  # divide by 1000 to scale to kilometers from meters
+>>>>>>> 1575259331040de897072e1008ceeb0409aeccb8
   D <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, 
                         dist.cutoff=disp_dist, n.cores)/1000
   G <- gamma0*exp(-D^2/(2*sigma^2))
   G[is.na(G)] <- 0
+  
   # incorporate spatially-explicit gamma into occupancy model
   z <- matrix(0, nsite, nseason)
-  z[,1] <- rbinom(nsite, 1, psi[,1])
-  z[which(anyDetections[,1] == 1),1] <- 1
-  ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
+  
+  # initial z at t = 1
+  z[,1] <- rbinom(nsite, 1, psi[,1]) 
+  
+  # species is there if we detected it
+  z[which(anyDetections[,1] == 1),1] <- 1 
+  
+  # likelihood of first season
+  ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log = TRUE)
   ll.y[,1] <- dbinom(y[,1], j[,1], z[1:nsampled,1]*p[1], log=TRUE)
+  
+  # generate z and y for season t > 1 and get log likelihood
   for(k in 2:nseason) {
     zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
     PrNotColonizedByNeighbor <- 1 - G*zkt
@@ -94,6 +147,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     # observation model
     ll.y[,k] <- dbinom(y[,k], j[,k], z[1:nsampled,k]*p[k], log=TRUE)
   }
+  # Initial candidate values based off of initials
   ll.z.cand <- ll.z
   ll.z.sum <- sum(ll.z, na.rm=TRUE)
   ll.y.cand <- ll.y
@@ -105,8 +159,18 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   nz1 <- z
   
   # STARTING UPDATING PROCESS
-  # objects to hold posterior samples
+  #  objects to hold posterior samples
+  param_mon <- c("alpha[1]","alpha[2]", "alpha[3]", "sigma", "b0.gam", 
+                 "b.gam[1]", "b.gam[2]", "b.gam[3]", "b.gam[4]", "b0.psi1", 
+                 "b.psi1[1]", "b.psi1[3]", "b.psi1[3]", "b0.eps", "b.eps[1]",
+                 "b.eps[2]", "b.eps[3]", "b.eps[4]", "b.eps[5]", "b.eps[6]",
+                 "b.eps[7]","b.eps[8]", "a0", "season[2]","season[3]", 
+                 "season[4]", "zk", "deviance")
   
+  # The number of parameters to estimate and zk for 13 seasons
+  npar <- length(param_mon) + nseason-1
+  
+<<<<<<< HEAD
   param_mon <- c("alpha[1]","alpha[2]", "alpha[3]", "sigma", "b0.gam", 
                  "b.gam[1]", "b.gam[2]", "b.gam[3]", "b.gam[4]", "b0.psi1", 
                  "b.psi1[1]", "b.psi1[3]", "b.psi1[3]", "b0.eps", "b.eps[1]", 
@@ -115,8 +179,12 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
                  "season[4]", "zk", "deviance")
   # The number of parameters to estimate and zk for 13 seasons
   npar <- length(param_mon) + nseason-1
+=======
+  # Holds posterior samples
+>>>>>>> 1575259331040de897072e1008ceeb0409aeccb8
   samples <- matrix(NA, iters, npar)
   colnames(samples) <- param_mon
+  
   # monitor z estimates for each patch
   zK <- matrix(NA, nsite, iters)
   
@@ -129,6 +197,9 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       zA <- array(NA, c(nsite, nseason, iters))
   }
   # report the first iteration of starting values
+  # *88888888888888888888888888888888888888888888888888888888
+  # MF: UPDATE THETA PARAMETERS TO REPORT
+  # 888888888888888888888888888888888888888888888888888888888
   if(reportit) {
       cat("iter 1\n")
       cat("    theta =", round(c(alpha, b0.psi1, b.psi1, b0.gam, b.gam, 
@@ -171,19 +242,37 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
                        as.table=TRUE))
         }
         }
-      }
-
-    ## Metropolis update for alpha[1]
+    }
+    #
+    # Metropolis updates. We need to randomly subsample the parameters
+    #  in a different order each step in the MCMC chain. To do so we
+    #  generate a sequence from 1 to length(tune) and randomly order it. 
+    #  The object 'tune' is the number of tuning parameters set for the
+    #  metropolis algorithms
+    #  We've numbered each of algorithms below from 1 to length(tune) and they
+    #  will be sampled at step `subiter` of the vector sampling_order.
+    sampling_order <- sample(seq(1, length(tune), 1), length(tune))
+    for(subiter in 1:length(tune)){
+      
+      ## Metropolis update for alpha[1]
+      if(sampling_order[subiter] == 1){
     alpha1.cand <- rnorm(1, alpha[1], tune[1])
     # create resistance surface
+<<<<<<< HEAD
     cost <- exp(alpha1.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + 
                   alpha[3]*r_covs[[3]])
+=======
+    cost <- exp(alpha1.cand*r_covs[[1]] + 
+                alpha[2]*r_covs[[2]] + 
+                alpha[3]*r_covs[[3]])
+>>>>>>> 1575259331040de897072e1008ceeb0409aeccb8
     # calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     # adjust diag. conductances
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE, scl=FALSE) 
     # calculate the ecological distance matrix in parallel
-    D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, disp_dist, n.cores)/1000
+    D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, 
+                               disp_dist, n.cores)/1000
     G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's are distances that were too far to colonize
     G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
@@ -191,8 +280,13 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
+<<<<<<< HEAD
       psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + 
         (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+=======
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + # w/ rescue effect
+                     (1-z[,k-1])*gamma.cand[,k-1] 
+>>>>>>> 1575259331040de897072e1008ceeb0409aeccb8
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -210,8 +304,10 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
-
+      } # close alpha[1] sampler
+      
     ## Metropolis update for alpha[2]
+      if(sampling_order[subiter] == 2){
     alpha2.cand <- rnorm(1, alpha[2], tune[2])
     # create resistance surface
     cost <- exp(alpha[1]*r_covs[[1]] + alpha2.cand*r_covs[[2]] + alpha[3]*r_covs[[3]]) 
@@ -219,7 +315,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
     # calculate the ecological distance matrix in parallel
-    D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, disp_dist, n.cores)/1000
+    D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, 
+                               disp_dist, n.cores)/1000
     G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's are distances that were too far to colonize
     G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
@@ -227,8 +324,13 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
+<<<<<<< HEAD
       psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + 
         (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+=======
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + # w/ rescue effect 
+                     (1-z[,k-1])*gamma.cand[,k-1] 
+>>>>>>> 1575259331040de897072e1008ceeb0409aeccb8
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -246,8 +348,10 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler for alpha[2]
     
     ## Metropolis update for alpha[3]
+      if(sampling_order[subiter] == 3){
     alpha3.cand <- rnorm(1, alpha[3], tune[3])
     # create resistance surface
     cost <- exp(alpha[1]*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha3.cand*r_covs[[3]])
@@ -255,7 +359,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
     # calculate the ecological distance matrix in parallel
-    D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, disp_dist, n.cores)/1000
+    D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, 
+                               disp_dist, n.cores)/1000
     G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's are distances that were too far to colonize
     G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
@@ -263,8 +368,13 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
+<<<<<<< HEAD
       psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + 
         (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+=======
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + # w/ rescue effect 
+                     (1-z[,k-1])*gamma.cand[,k-1] 
+>>>>>>> 1575259331040de897072e1008ceeb0409aeccb8
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -282,11 +392,19 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
-
+      } # close sampler for alpha[3]
+    
     ## Metropolis update for b0.gam - part of gamma0 linear model
+      if(sampling_order[subiter] == 4){
     b0.gam.cand <- rnorm(1, b0.gam, tune[4])
     gamma0.cand <- plogis(b0.gam.cand + b.gam[1]*site_covs[,"size"] + 
+<<<<<<< HEAD
                             b.gam[2]*site_covs[,"park"] + b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
+=======
+                                        b.gam[2]*site_covs[,"park"] + 
+                                        b.gam[3]*site_covs[,"cem"] + 
+                                        b.gam[4]*site_covs[,"golf"])
+>>>>>>> 1575259331040de897072e1008ceeb0409aeccb8
     G.cand <- gamma0.cand*exp(-D^2/(2*sigma^2))
     G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
@@ -294,7 +412,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + # w/ rescue effect 
+                      (1-z[,k-1])*gamma.cand[,k-1] 
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -312,10 +431,15 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler b0.gam
     
     ## Metropolis update for b.gam[1] - part of gamma0 linear model
+      if(sampling_order[subiter] == 5){
     b1.gam.cand <- rnorm(1, b.gam[1], tune[5])
-    gamma0.cand <- plogis(b0.gam + b1.gam.cand*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
+    gamma0.cand <- plogis(b0.gam + b1.gam.cand*site_covs[,"size"] + 
+                                   b.gam[2]*site_covs[,"park"] + 
+                                   b.gam[3]*site_covs[,"cem"] + 
+                                   b.gam[4]*site_covs[,"golf"])
     G.cand <- gamma0.cand*exp(-D^2/(2*sigma^2))
     G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
@@ -323,7 +447,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + # w/ rescue effect 
+                     (1-z[,k-1])*gamma.cand[,k-1] 
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -341,10 +466,15 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler b.gam[1]
     
     ## Metropolis update for b.gam[2] - part of gamma0 linear model
+      if(sampling_order[subiter] == 6){
     b2.gam.cand <- rnorm(1, b.gam[2], tune[6])
-    gamma0.cand <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + b2.gam.cand*site_covs[,"park"] + b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
+    gamma0.cand <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + 
+                                   b2.gam.cand*site_covs[,"park"] +
+                                   b.gam[3]*site_covs[,"cem"] +
+                                   b.gam[4]*site_covs[,"golf"])
     G.cand <- gamma0.cand*exp(-D^2/(2*sigma^2))
     G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
@@ -352,7 +482,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + # w/ rescue effect
+                     (1-z[,k-1])*gamma.cand[,k-1] 
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -370,10 +501,15 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler b.gam[2]
     
     ## Metropolis update for b.gam[3] - part of gamma0 linear model
+      if(sampling_order[subiter] == 7){
     b3.gam.cand <- rnorm(1, b.gam[3], tune[7])
-    gamma0.cand <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + b3.gam.cand*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
+    gamma0.cand <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + 
+                                   b.gam[2]*site_covs[,"park"] + 
+                                   b3.gam.cand*site_covs[,"cem"] +
+                                   b.gam[4]*site_covs[,"golf"])
     G.cand <- gamma0.cand*exp(-D^2/(2*sigma^2))
     G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
@@ -381,7 +517,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + # w/ rescue effect 
+                   (1-z[,k-1])*gamma.cand[,k-1] 
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -399,10 +536,15 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler b.gam[3]
     
     ## Metropolis update for b.gam[4] - part of gamma0 linear model
+      if(sampling_order[subiter] == 8){
     b4.gam.cand <- rnorm(1, b.gam[4], tune[8])
-    gamma0.cand <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + b.gam[3]*site_covs[,"cem"] + b4.gam.cand*site_covs[,"golf"])
+    gamma0.cand <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + 
+                                   b.gam[2]*site_covs[,"park"] +
+                                   b.gam[3]*site_covs[,"cem"] + 
+                                   b4.gam.cand*site_covs[,"golf"])
     G.cand <- gamma0.cand*exp(-D^2/(2*sigma^2))
     G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
@@ -410,7 +552,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + # w/ rescue effect 
+                   (1-z[,k-1])*gamma.cand[,k-1] 
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -428,8 +571,10 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler for b.gam[4]
     
     ## Metropolis update for sigma
+      if(sampling_order[subiter] == 9){
     sigma.cand <- abs(rnorm(1, sigma, tune[9]))
     G.cand <- gamma0*exp(-D^2/(2*sigma.cand^2))
     G.cand[is.na(G.cand)] <- 0 # change NA's to 0
@@ -438,7 +583,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + # w/ rescue effect 
+                   (1-z[,k-1])*gamma.cand[,k-1] 
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -455,15 +601,20 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler for sigma
     
     ## Metropolis update for b0.psi1 - part of linear predictor for initial occupancy
+      if(sampling_order[subiter] == 10){
     b0.psi1.cand <- rnorm(1, b0.psi1, tune[10])
     # model
-    psi1.cand <- plogis(b0.psi1.cand + b.psi1[1]*site_covs[,"park"] + b.psi1[2]*site_covs[,"cem"] + b.psi1[3]*site_covs[,"golf"])
+    psi1.cand <- plogis(b0.psi1.cand + b.psi1[1]*site_covs[,"park"] + 
+                                       b.psi1[2]*site_covs[,"cem"] + 
+                                       b.psi1[3]*site_covs[,"golf"])
     psi.cand[,1] <- psi1.cand
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + # w/ rescue effect
+                   (1-z[,k-1])*gamma[,k-1] 
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -479,15 +630,20 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # Close sampler for b0.psi1
     
     ## Metropolis update for b.psi1[1] - part of linear predictor for initial occupancy
+      if(sampling_order[subiter] == 11){
     b1.psi1.cand <- rnorm(1, b.psi1[1], tune[11])
     # model
-    psi1.cand <- plogis(b0.psi1 + b1.psi1.cand*site_covs[,"park"] + b.psi1[2]*site_covs[,"cem"] + b.psi1[3]*site_covs[,"golf"])
+    psi1.cand <- plogis(b0.psi1 + b1.psi1.cand*site_covs[,"park"] + 
+                                  b.psi1[2]*site_covs[,"cem"] + 
+                                  b.psi1[3]*site_covs[,"golf"])
     psi.cand[,1] <- psi1.cand
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + 
+                   (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -503,15 +659,20 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # Close sampler for b.psi[1]
     
     ## Metropolis update for b.psi1[2] - part of linear predictor for initial occupancy
+      if(sampling_order[subiter] == 12){
     b2.psi1.cand <- rnorm(1, b.psi1[2], tune[12])
     # model
-    psi1.cand <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] + b2.psi1.cand*site_covs[,"cem"] + b.psi1[3]*site_covs[,"golf"])
+    psi1.cand <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] + 
+                                  b2.psi1.cand*site_covs[,"cem"] +
+                                  b.psi1[3]*site_covs[,"golf"])
     psi.cand[,1] <- psi1.cand
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + # w/ rescue effect
+                   (1-z[,k-1])*gamma[,k-1] 
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -527,15 +688,20 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler for b.psi1[2]
     
     ## Metropolis update for b.psi1[3] - part of linear predictor for initial occupancy
+      if(sampling_order[subiter] == 13){
     b3.psi1.cand <- rnorm(1, b.psi1[3], tune[13])
     # model
-    psi1.cand <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] + b.psi1[2]*site_covs[,"cem"] + b3.psi1.cand*site_covs[,"golf"])
+    psi1.cand <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] + 
+                                  b.psi1[2]*site_covs[,"cem"] +
+                                  b3.psi1.cand*site_covs[,"golf"])
     psi.cand[,1] <- psi1.cand
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + # w/ rescue effect
+                   (1-z[,k-1])*gamma[,k-1] 
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -551,15 +717,24 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler for b.psi1[3]
     
     ## Metropolis update for b0.eps - part of the linear predictor for epsilon
+      if(sampling_order[subiter] == 14){
     b0.eps.cand <- rnorm(1, b0.eps, tune[14])
-    epsilon.cand <- plogis(b0.eps.cand + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
-                        b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
+    epsilon.cand <- plogis(b0.eps.cand + b.eps[1]*site_covs[,"tree"] + 
+                                         b.eps[2]*site_covs[,"total_veg"] +
+                                         b.eps[3]*site_covs[,"size"] +
+                                         b.eps[4]*site_covs[,"pop10"] +
+                                         b.eps[5]*site_covs[,"water"] +
+                                         b.eps[6]*site_covs[,"park"] +
+                                         b.eps[7]*site_covs[,"cem"] +
+                                         b.eps[8]*site_covs[,"golf"])
     psi.cand[,1] <- psi1
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) + 
+                   (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -575,15 +750,24 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler b0.eps
    
     ## Metropolis update for b.eps[1] - part of the linear predictor for epsilon
+      if(sampling_order[subiter] == 15){
     b1.eps.cand <- rnorm(1, b.eps[1], tune[15])
-    epsilon.cand <- plogis(b0.eps + b1.eps.cand*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
-                             b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
+    epsilon.cand <- plogis(b0.eps + b1.eps.cand*site_covs[,"tree"] +
+                                    b.eps[2]*site_covs[,"total_veg"] +
+                                    b.eps[3]*site_covs[,"size"] +
+                                    b.eps[4]*site_covs[,"pop10"] +
+                                    b.eps[5]*site_covs[,"water"] +
+                                    b.eps[6]*site_covs[,"park"] +
+                                    b.eps[7]*site_covs[,"cem"] +
+                                    b.eps[8]*site_covs[,"golf"])
     psi.cand[,1] <- psi1
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) +
+                   (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -599,15 +783,24 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler b.eps[1]
     
     ## Metropolis update for b.eps[2] - part of the linear predictor for epsilon
+      if(sampling_order[subiter] == 16){
     b2.eps.cand <- rnorm(1, b.eps[2], tune[16])
-    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b2.eps.cand*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
-                             b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
+                                    b2.eps.cand*site_covs[,"total_veg"] +
+                                    b.eps[3]*site_covs[,"size"] +
+                                    b.eps[4]*site_covs[,"pop10"] +
+                                    b.eps[5]*site_covs[,"water"] +
+                                    b.eps[6]*site_covs[,"park"] +
+                                    b.eps[7]*site_covs[,"cem"] +
+                                    b.eps[8]*site_covs[,"golf"])
     psi.cand[,1] <- psi1
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) +
+                   (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -623,15 +816,24 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler b.eps[2]
     
     ## Metropolis update for b.eps[3] - part of the linear predictor for epsilon
+      if(sampling_order[subiter] == 17){
     b3.eps.cand <- rnorm(1, b.eps[3], tune[17])
-    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b3.eps.cand*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
-                             b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
+                                    b.eps[2]*site_covs[,"total_veg"] +
+                                    b3.eps.cand*site_covs[,"size"] +
+                                    b.eps[4]*site_covs[,"pop10"] +
+                                    b.eps[5]*site_covs[,"water"] +
+                                    b.eps[6]*site_covs[,"park"] +
+                                    b.eps[7]*site_covs[,"cem"] +
+                                    b.eps[8]*site_covs[,"golf"])
     psi.cand[,1] <- psi1
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) + 
+                   (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -647,15 +849,24 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler b.eps[3]
     
     ## Metropolis update for b.eps[4] - part of the linear predictor for epsilon
+      if(sampling_order[subiter] == 18){
     b4.eps.cand <- rnorm(1, b.eps[4], tune[18])
-    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b4.eps.cand*site_covs[,"pop10"] +
-                             b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
+                                    b.eps[2]*site_covs[,"total_veg"] +
+                                    b.eps[3]*site_covs[,"size"] +
+                                    b4.eps.cand*site_covs[,"pop10"] +
+                                    b.eps[5]*site_covs[,"water"] +
+                                    b.eps[6]*site_covs[,"park"] +
+                                    b.eps[7]*site_covs[,"cem"] +
+                                    b.eps[8]*site_covs[,"golf"])
     psi.cand[,1] <- psi1
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) +
+                   (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -671,15 +882,24 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
-    
+      } # close sampler b.eps[4]
+      
     ## Metropolis update for b.eps[5] - part of the linear predictor for epsilon
+      if(sampling_order[subiter] == 19){
     b5.eps.cand <- rnorm(1, b.eps[5], tune[19])
-    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
-                             b5.eps.cand*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
+                                    b.eps[2]*site_covs[,"total_veg"] +
+                                    b.eps[3]*site_covs[,"size"] +
+                                    b.eps[4]*site_covs[,"pop10"] +
+                                    b5.eps.cand*site_covs[,"water"] +
+                                    b.eps[6]*site_covs[,"park"] +
+                                    b.eps[7]*site_covs[,"cem"] +
+                                    b.eps[8]*site_covs[,"golf"])
     psi.cand[,1] <- psi1
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) +
+                   (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -695,15 +915,24 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler b.eps[5]
 
     ## Metropolis update for b.eps[6] - part of the linear predictor for epsilon
+      if(sampling_order[subiter] == 20){
     b6.eps.cand <- rnorm(1, b.eps[6], tune[20])
-    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
-                             b.eps[5]*site_covs[,"water"] + b6.eps.cand*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
+                                    b.eps[2]*site_covs[,"total_veg"] +
+                                    b.eps[3]*site_covs[,"size"] +
+                                    b.eps[4]*site_covs[,"pop10"] +
+                                    b.eps[5]*site_covs[,"water"] +
+                                    b6.eps.cand*site_covs[,"park"] +
+                                    b.eps[7]*site_covs[,"cem"] +
+                                    b.eps[8]*site_covs[,"golf"])
     psi.cand[,1] <- psi1
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) +
+                   (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -719,15 +948,24 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler b.eps[6]
     
     ## Metropolis update for b.eps[7] - part of the linear predictor for epsilon
+      if(sampling_order[subiter] == 21){
     b7.eps.cand <- rnorm(1, b.eps[7], tune[21])
-    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
-                             b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b7.eps.cand*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
+                                    b.eps[2]*site_covs[,"total_veg"] +
+                                    b.eps[3]*site_covs[,"size"] +
+                                    b.eps[4]*site_covs[,"pop10"] +
+                                    b.eps[5]*site_covs[,"water"] +
+                                    b.eps[6]*site_covs[,"park"] +
+                                    b7.eps.cand*site_covs[,"cem"] +
+                                    b.eps[8]*site_covs[,"golf"])
     psi.cand[,1] <- psi1
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) +
+                   (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -743,15 +981,24 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler b.eps[7]
     
     ## Metropolis update for b.eps[8] - part of the linear predictor for epsilon
+      if(sampling_order[subiter] == 22){
     b8.eps.cand <- rnorm(1, b.eps[8], tune[22])
-    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
-                             b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b8.eps.cand*site_covs[,"golf"])
+    epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
+                                    b.eps[2]*site_covs[,"total_veg"] +
+                                    b.eps[3]*site_covs[,"size"] +
+                                    b.eps[4]*site_covs[,"pop10"] +
+                                    b.eps[5]*site_covs[,"water"] +
+                                    b.eps[6]*site_covs[,"park"] +
+                                    b.eps[7]*site_covs[,"cem"] +
+                                    b8.eps.cand*site_covs[,"golf"])
     psi.cand[,1] <- psi1
     ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
     for(k in 2:nseason) {
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) +
+                   (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -767,8 +1014,10 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.z <- ll.z.cand
       ll.z.sum <- ll.z.sum.cand
     }
+      } # close sampler b.eps[8]
     
     ## Metropolis update for z
+      if(sampling_order[subiter] == 23){
     zkup <- rep(0, nseason)
     zknown1 <- anyDetections[,1]==1
     zknown1[is.na(zknown1)] <- FALSE
@@ -822,8 +1071,9 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z2 <- sum(ll.z[,k+1])
             ll.z2.cand <- sum(ll.z.cand[,k+1])
             }
-          if(runif(1) < exp((sum(ll.y.cand.tmp, na.rm=TRUE) + ll.z.cand[i,k] + ll.z2.cand) -
-                           (ll.y.tmp + ll.z[i,k] + ll.z2))) {
+          if(runif(1) < exp((sum(ll.y.cand.tmp, na.rm=TRUE) + 
+                                 ll.z.cand[i,k] + ll.z2.cand) -
+                                (ll.y.tmp + ll.z[i,k] + ll.z2))) {
             z[,k] <- zk.cand
             ll.z[i,k] <- ll.z.cand[i,k]
             if(k < nseason) {
@@ -840,8 +1090,10 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       }
     
     nz1 <- nz1+z
+      } # close sampler z
     
     ## Metropolis update for a0 - part of detection probability
+      if(sampling_order[subiter] == 23){
     a0.cand<-rnorm(1, a0, tune[23])
     p.cand <- plogis(a0.cand + season[season_vec])
     p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
@@ -862,8 +1114,10 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         ll.y <- ll.y.cand
         ll.y.sum <- ll.y.sum.cand
     }
+      } # close sampler a0
 
     #Update for season 2
+      if(sampling_order[subiter] == 24){
     season2.cand.vec <- season
     season2.cand.vec[2] <- rnorm(1, season[2], tune[24])
     p.cand <- plogis(a0 + season2.cand.vec[season_vec])
@@ -885,8 +1139,10 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.y <- ll.y.cand
       ll.y.sum <- ll.y.sum.cand
     }
+      } # close sampler season2
 
     # Update for season 3
+      if(sampling_order[subiter] == 25){
     season3.cand.vec <- season
     season3.cand.vec[3] <- rnorm(1, season[3], tune[25])
     p.cand <- plogis(a0 + season3.cand.vec[season_vec])
@@ -908,8 +1164,10 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.y <- ll.y.cand
       ll.y.sum <- ll.y.sum.cand
     }
+      } # close sampler season3
     
     # Update for season 4
+      if(sampling_order[subiter] == 26){
     season4.cand.vec <- season
     season4.cand.vec[4] <- rnorm(1, season[4], tune[26])
     p.cand <- plogis(a0 + season4.cand.vec[season_vec])
@@ -931,6 +1189,9 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       ll.y <- ll.y.cand
       ll.y.sum <- ll.y.sum.cand
     }
+      } # close sampler season4
+      
+    } # close subiter loop
 
     zk <- colSums(z)
     
