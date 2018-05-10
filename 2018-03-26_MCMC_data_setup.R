@@ -144,20 +144,26 @@ pop40 <- (covs2[,"CMAP_pop40_dens"] - mean(covs2[,"CMAP_pop40_dens"]))/sd(covs2[
 sitecovs2 <- cbind(tree, total_veg, water, size, pop10, park, golf, cem)
 
 x <- coords
-y <- y_mat
+y <- y.gen
 j <- j_mat
 site_covs <- sitecovs2
 obs_covs <- season_vec
 r_covs <- res_covs
 disp_dist <- 100000
 n.cores <- 4
-iters <- 5
-report <- 10
+iters <- 1000
+report <- 100
 monitor.z <- TRUE
 plot.z <- TRUE
 # tune order (alpha[1], alpha[2], alpha[3], b0.gam, b.gam[1], b.gam[2], b.gam[3], b.gam[4], sigma, b0.psi1, b.psi1[1], b.psi1[2], b.psi1[3],
 # b0.eps, b.eps[1], b.eps[2], b.eps[3], b.eps[4], b.eps[5], b.eps[6], b.eps[7], b.eps[8], a0, season[2], season[3], season[4]
-tune <- c(0.3, 0.3, 0.3, 1, 1, 1, 1, 1, 0.3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+tune <- c(0.3, 0.3, 0.3, # alpha coefficients
+          1, 1, 1, 1, 1, # gamma coefficients
+          0.3, # sigma
+          1, 1, 1, 1, # psi1 coefficients
+          1, 1, 1, 1, 1, 1, 1, 1, 1, # epsilon coefficients
+          1, 1, 1, 1 #a0 and season parameters (detection)
+          )
 
 length(tune)
 

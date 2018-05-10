@@ -26,9 +26,6 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   nseason <- ncol(y)
   nsampled <- nrow(y)
   
-  ## Using this to avoid likelihood calculations for sites not sampled
-  #dataYears <- apply(!is.na(y), 3, any) #********************* need to see if this stays or is adapted ****************************
-  
   ## indicating real detections from data
   anyDetections <- matrix(FALSE, nsite, nseason)
   anyDetections[1:nsampled,] <- as.numeric(y > 0)
@@ -42,13 +39,16 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # colonization
   b0.gam <- rnorm(1,0,0.5) # intercept
   b.gam <- rnorm(4,0,0.5) # 4 covariates
-  gamma0 <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
+  gamma0 <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + 
+                     b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
   sigma <- runif(1,1,10)
   # extinction
   b0.eps <- rnorm(1,0,0.5) # intercept
   b.eps <- rnorm(8,0,0.5) # 8 covariates
-  epsilon <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
-                      b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
+  epsilon <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] 
+                    + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
+                      b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + 
+                      b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
   # detection
   p <- rep(0, nseason)
   a0 <- rnorm(1,0,0.5)
@@ -58,7 +58,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # need to run through the model to generate starting values for z[,k-1] based off z[,1] starting values,
   # psi, gamma, and likelihoods for z and y
   gamma <- matrix(NA, nsite, nseason-1)
-  psi1 <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] + b.psi1[2]*site_covs[,"cem"] + b.psi1[3]*site_covs[,"golf"])
+  psi1 <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] + 
+                   b.psi1[2]*site_covs[,"cem"] + b.psi1[3]*site_covs[,"golf"])
   psi <- matrix(NA, nsite, nseason)
   psi[,1] <- psi1
   ll.z <- matrix(0, nsite, nseason)
@@ -71,7 +72,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # adjust diag. conductances
   tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE, scl=FALSE) 
   # calculate the ecological distance matrix in parallel
-  D <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, dist.cutoff=disp_dist, n.cores)/1000
+  D <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, 
+                        dist.cutoff=disp_dist, n.cores)/1000
   G <- gamma0*exp(-D^2/(2*sigma^2))
   G[is.na(G)] <- 0
   # incorporate spatially-explicit gamma into occupancy model
@@ -105,10 +107,14 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # STARTING UPDATING PROCESS
   # objects to hold posterior samples
   
-  param_mon <- c("alpha[1]","alpha[2]", "alpha[3]", "sigma", "b0.gam", "b.gam[1]", "b.gam[2]", "b.gam[3]", "b.gam[4]", "b0.psi1", 
-    "b.psi1[1]", "b.psi1[3]", "b.psi1[3]", "b0.eps", "b.eps[1]", "b.eps[2]", "b.eps[3]", "b.eps[4]", "b.eps[5]", "b.eps[6]", "b.eps[7]",
-    "b.eps[8]", "a0", "season[2]","season[3]", "season[4]", "zk", "deviance")
-  npar <- length(param_mon) + nseason-1 # The number of parameters to estimate and zk for 13 seasons
+  param_mon <- c("alpha[1]","alpha[2]", "alpha[3]", "sigma", "b0.gam", 
+                 "b.gam[1]", "b.gam[2]", "b.gam[3]", "b.gam[4]", "b0.psi1", 
+                 "b.psi1[1]", "b.psi1[3]", "b.psi1[3]", "b0.eps", "b.eps[1]", 
+                 "b.eps[2]", "b.eps[3]", "b.eps[4]", "b.eps[5]", "b.eps[6]", 
+                 "b.eps[7]", "b.eps[8]", "a0", "season[2]","season[3]", 
+                 "season[4]", "zk", "deviance")
+  # The number of parameters to estimate and zk for 13 seasons
+  npar <- length(param_mon) + nseason-1
   samples <- matrix(NA, iters, npar)
   colnames(samples) <- param_mon
   # monitor z estimates for each patch
@@ -125,16 +131,19 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # report the first iteration of starting values
   if(reportit) {
       cat("iter 1\n")
-      cat("    theta =", round(c(alpha, b0.psi1, b.psi1, b0.gam, b.gam, sigma, b0.eps, b.eps, a0, season[2:4], zk), 5), "\n")
+      cat("    theta =", round(c(alpha, b0.psi1, b.psi1, b0.gam, b.gam, 
+                                 sigma, b0.eps, b.eps, a0, season[2:4], zk), 5),
+          "\n")
       cat("    z[k] =", round(colSums(z), 2), "\n")
       cat("    sum_ll.z =", round(sum(ll.z), 2), "\n")
       cat("    deviance =", round(-2*ll.y.sum, 2), "\n")
       cat("    time =", format(Sys.time()), "\n")
       if(plot.z) {
           library(lattice)
-          zd <- data.frame(z=as.integer(z), season=rep(1:11, each=nsite),
+          zd <- data.frame(z=as.integer(z), season=rep(1:nseason, each=nsite),
                            x=as.numeric(x[,1])/1000, y=as.numeric(x[,2])/1000)
-          print(xyplot(y ~ x | season, zd, groups=z, aspect="iso", pch=c(1,16), as.table=TRUE))
+          print(xyplot(y ~ x | season, zd, groups=z, aspect="iso", pch=c(1,16), 
+                       as.table=TRUE))
       }
   }
 
@@ -150,14 +159,16 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         cat("iter", s, "\n")
         cat("    theta =", round(samples[s-1,], 5), "\n")
         cat("    z[k] =", zk, "\n")
-        cat("    accepted", round((zkup/nsite)*100, 1), "percent of z[k] proposals \n")
+        cat("    accepted", round((zkup/nsite)*100, 1), 
+            "percent of z[k] proposals \n")
         cat("    sum(ll.z) =", ll.z.sum, "\n")
         cat("    deviance =", round(samples[s-1,38], 2), "\n")
         cat("    time =", format(Sys.time()), "\n")
         if(plot.z) {
           library(lattice)
           zd$z <- as.integer(z)
-          print(xyplot(y ~ x | season, zd, groups=z, aspect="iso", pch=c(1,16), as.table=TRUE))
+          print(xyplot(y ~ x | season, zd, groups=z, aspect="iso", pch=c(1,16), 
+                       as.table=TRUE))
         }
         }
       }
@@ -165,7 +176,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     ## Metropolis update for alpha[1]
     alpha1.cand <- rnorm(1, alpha[1], tune[1])
     # create resistance surface
-    cost <- exp(alpha1.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha[3]*r_covs[[3]])
+    cost <- exp(alpha1.cand*r_covs[[1]] + alpha[2]*r_covs[[2]] + 
+                  alpha[3]*r_covs[[3]])
     # calculate conductances among neighbors
     tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
     # adjust diag. conductances
@@ -179,7 +191,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + 
+        (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -214,7 +227,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + 
+        (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -249,7 +263,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     for(k in 2:nseason) {
       zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
       gamma.cand[,k-1] <- 1 - exp(rowSums(log(1-G.cand*zkt)))
-      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
+      psi.cand[,k] <- z[,k-1]*(1-epsilon*(1-gamma.cand[,k-1])) + 
+        (1-z[,k-1])*gamma.cand[,k-1] # w/ rescue effect
       ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
     }
     # priors
@@ -270,7 +285,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
 
     ## Metropolis update for b0.gam - part of gamma0 linear model
     b0.gam.cand <- rnorm(1, b0.gam, tune[4])
-    gamma0.cand <- plogis(b0.gam.cand + b.gam[1]*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
+    gamma0.cand <- plogis(b0.gam.cand + b.gam[1]*site_covs[,"size"] + 
+                            b.gam[2]*site_covs[,"park"] + b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
     G.cand <- gamma0.cand*exp(-D^2/(2*sigma^2))
     G.cand[is.na(G.cand)] <- 0 # change NA's to 0
     # model
