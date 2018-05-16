@@ -25,7 +25,8 @@ full_site_names[!full_site_names %in% covs$Station.ID] # see the mismatch
 sites_names <- as.character(full_site_names[-c(20,23,70,94,96)])
 
 # load species specific data - remove sites that we do not use in this analysis
-z_mat <- df_2_array(read.table("./Data/z_matrix_sp10_sp13_6_1_17.txt", header = TRUE, sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
+z_mat <- df_2_array(read.table("./Data/z_matrix_sp10_sp13_6_1_17.txt", header = TRUE, 
+                               sep = "\t"))[1,-c(20,23,70,94,96),-c(1,2)]
 
 # build y-array (detection) and j-matrix (n days sampled)
 y_mat <- df_2_array(read.table("./Data/y_matrix_sp10_sp13_6_1_17.txt", 
@@ -163,13 +164,13 @@ pop40 <- (covs2[,"CMAP_pop40_dens"] - mean(covs2[,"CMAP_pop40_dens"]))/sd(covs2[
 sitecovs2 <- cbind(tree, total_veg, water, size, pop10, park, golf, cem)
 
 x <- coords
-y <- y.gen
+y <- y_gen
 j <- j_mat
 site_covs <- sitecovs2
 obs_covs <- season_vec
 r_covs <- res_covs
 disp_dist <- 100000
-n.cores <- 4
+n.cores <- 6
 iters <- 1000
 report <- 100
 monitor.z <- TRUE
@@ -177,11 +178,11 @@ plot.z <- TRUE
 # tune order (alpha[1], alpha[2], alpha[3], b0.gam, b.gam[1], b.gam[2], b.gam[3], b.gam[4], sigma, b0.psi1, b.psi1[1], b.psi1[2], b.psi1[3],
 # b0.eps, b.eps[1], b.eps[2], b.eps[3], b.eps[4], b.eps[5], b.eps[6], b.eps[7], b.eps[8], a0, season[2], season[3], season[4]
 tune <- c(0.3, 0.3, 0.3, # alpha coefficients
-          1, 1, 1, 1, 1, # gamma coefficients
+          0.5, 0.5, 0.5, 0.5, 0.5, # gamma coefficients
           0.3, # sigma
-          1, 1, 1, 1, # psi1 coefficients
-          1, 1, 1, 1, 1, 1, 1, 1, 1, # epsilon coefficients
-          1, 1, 1, 1 #a0 and season parameters (detection)
+          0.5, 0.5, 0.5, 0.5, # psi0.5 coefficients
+          0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, # epsilon coefficients
+          0.5, 0.5, 0.5, 0.5 #a0 and season parameters (detection)
           )
 
 length(tune)
