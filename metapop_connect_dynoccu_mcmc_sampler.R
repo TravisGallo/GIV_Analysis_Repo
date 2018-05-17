@@ -32,7 +32,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   
   ## initial values for sampler
   # resistence
-  alpha <-   rnorm(3, 0, 0.2)
+  alpha <-   rnorm(3, 1, 0.2)
   # initial occupancy
   b0.psi1 <- rnorm(1, 0, 0.5)
   b.psi1 <-  rnorm(3, 0, 0.5)
@@ -42,20 +42,6 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   gamma0 <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + 
                      b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
   sigma <- runif(1,1,10)
-  # extinction
-  b0.eps <- rnorm(1,0,0.5) # intercept
-  b.eps <- rnorm(8,0,0.5) # 8 covariates
-  epsilon <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] + b.eps[2]*site_covs[,"total_veg"] 
-                    + b.eps[3]*site_covs[,"size"] + b.eps[4]*site_covs[,"pop10"] +
-                      b.eps[5]*site_covs[,"water"] + b.eps[6]*site_covs[,"park"] + 
-                      b.eps[7]*site_covs[,"cem"] + b.eps[8]*site_covs[,"golf"])
-  b0.gam <-  rnorm(1, 0, 0.5) # intercept
-  b.gam <-   rnorm(4, 0, 0.5) # 4 covariates
-  gamma0 <-  plogis(b0.gam + b.gam[1]*site_covs[ ,"size"] + 
-                             b.gam[2]*site_covs[ ,"park"] + 
-                             b.gam[3]*site_covs[ ,"cem"]  + 
-                             b.gam[4]*site_covs[ ,"golf"] )
-  sigma <-   runif(1, 1, 10)
   # extinction
   b0.eps <-  rnorm(1, 0, 0.5) # intercept
   b.eps <-   rnorm(8, 0, 0.5) # 8 covariates
@@ -128,7 +114,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   for(k in 2:nseason) {
     zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
     PrNotColonizedByNeighbor <- 1 - G*zkt
-    PrNotColonizedAtAll <- apply(PrNotColonizedByNeighbor, 1, prod, na.rm=TRUE)
+    PrNotColonizedAtAll <- apply(PrNotColonizedByNeighbor[1:2,], 1, prod, na.rm=TRUE)
     gamma[,k-1] <- 1 - PrNotColonizedAtAll
     psi[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] #Rescue effect
     z[,k] <- rbinom(nsite, 1, psi[,k])
@@ -165,7 +151,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   colnames(samples) <- param_mon
   
   # monitor z estimates for each patch
-  zK <- matrix(NA, nsite, iters)
+  zk <- matrix(NA, nsite, iters)
   
   # indicator that report it parameter is true
   reportit <- report > 0
@@ -238,7 +224,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         # create resistance surface
         cost <- exp(alpha1.cand*r_covs[[1]] + # 1-NDVI
                     alpha[2]*r_covs[[2]] +    # population density
-                    alpha[3]*r_covs[[3]])     # patch inidication
+                    alpha[3]*r_covs[[3]])     # patch indicator
         # calculate conductances among neighbors
         tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
         # adjust diag. conductances
@@ -246,7 +232,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         # calculate the ecological distance matrix in parallel
         D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, 
                                    disp_dist, n.cores)/1000
-        G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's are distances that were too far to colonize
+        G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's = distances too far to colonize
         G.cand[is.na(G.cand)] <- 0 # change NA's to 0
         # model
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi[,1], log=TRUE)
@@ -1010,26 +996,26 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
           if(zknown[i]) next
           # z candidate values
           zk.cand <- z[,k] # grab a vector of z candidates from initial values for each season
-          zk.cand[i] <- 1-z[i,k] # if we give it the oppposite does that decrease or increase the likelihood?
+          zk.cand[i] <- 1-z[i,k] # give it the oppposite, does that decrease or increase likelihood?
           # ll.y candidate
           ll.y.tmp <- ll.y.cand.tmp <- 0
           if(i <= nsampled) { # only use sampled sites
             ll.y.cand.tmp <- dbinom(y[i,k], j[i,k], zk.cand[i]*p[k], log=TRUE)
-            ll.y.tmp <- sum(ll.y[i,k], na.rm=TRUE) # trick to turn all NA's to 0
-            }
+            ll.y.tmp <- sum(ll.y[i,k], na.rm=TRUE) # trick to turn NA's to 0
+          }
           # prior for z
           # note from Howell et al (2018): Prior must be calculated for time k and k+1 b/c change in z affects both
-          ll.z.cand[i,k] <- dbinom(zk.cand[i], 1, psi.cand[i,k], log=TRUE)
+          ll.z.cand[i,k] <- dbinom(zk.cand[i], 1, psi[i,k], log=TRUE)
           ll.z2 <- ll.z2.cand <- 0
           if(k < nseason) {
             zkt.cand <- matrix(zk.cand, nsite, nsite, byrow=TRUE)
             gamma.cand[,k] <- 1 - exp(rowSums(log(1-G*zkt.cand)))
             psi.cand[,k] <- (zk.cand*(1-epsilon*(1-gamma.cand[,k])) +
                                (1-zk.cand)*gamma.cand[,k])
-            ll.z.cand[,k+1] <- dbinom(z[,k+1], 1, psi.cand[,k+1], log=TRUE)
+            ll.z.cand[,k+1] <- dbinom(z[,k+1], 1, psi.cand[,k], log=TRUE)
             ll.z2 <- sum(ll.z[,k+1])
             ll.z2.cand <- sum(ll.z.cand[,k+1])
-            }
+          }
           if(runif(1) < exp((sum(ll.y.cand.tmp, na.rm=TRUE) + 
                                  ll.z.cand[i,k] + ll.z2.cand) -
                                 (ll.y.tmp + ll.z[i,k] + ll.z2))) {
