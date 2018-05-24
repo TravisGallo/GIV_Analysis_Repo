@@ -61,12 +61,15 @@ tree <- (covs[,"patch_tree"] - mean(covs[,"patch_tree"]))/sd(covs[,"patch_tree"]
 total_veg <- (covs[,"patch_total_veg"] - mean(covs[,"patch_total_veg"]))/sd(covs[,"patch_total_veg"])
 # water present
 water <- covs[,"water_present"]
-# patch size (scaled)
-size <- (covs[,"patch_size"] - mean(covs[,"patch_size"]))/sd(covs[,"patch_size"])
+# patch size (scaled and in km)
+size_km <- log(covs[,"patch_size"]/1000000) # log transform to remove long right tail
+size <- (size_km - mean(size_km))/sd(size_km)
 # population density 2010 (scaled)
-pop10 <- (covs[,"CMAP_pop10_dens"] - mean(covs[,"CMAP_pop10_dens"]))/sd(covs[,"CMAP_pop10_dens"])
+pop10_log <- log(covs[,"CMAP_pop10_dens"]) # log transform to remove long right tail
+pop10 <- (pop10_log - mean(pop10_log))/sd(pop10_log)
 # population density 2040 (scaled)
-pop40 <- (covs[,"CMAP_pop40_dens"] - mean(covs[,"CMAP_pop40_dens"]))/sd(covs[,"CMAP_pop40_dens"])
+pop40_log <- log(covs[,"CMAP_pop40_dens"]) # log transform to remove long right tail
+pop40 <- (pop40_log - mean(pop40_log))/sd(pop40_log)
 # data matrix
 sitecovs <- cbind(tree, total_veg, water, size, pop10, park, golf, cem)
 
@@ -86,7 +89,10 @@ ndvi_scale <- scale(ndvi_coarse)
 # 2010 population density raster (scaled)
 pop10_res <- crop(raster("./Data/CMAP_PHH10.tif"), study_extent)
 pop10_coarse <- aggregate(pop10_res, fact=4, fun=mean)
-pop10_scale <- scale(pop10_coarse)
+# add 0.001 to all population values to remove 0's
+values(pop10_coarse) <- values(pop10_coarse) + 0.001
+# log transform to remove large right tale and scale mean 0
+pop10_scale <- scale(log(pop10_tranform))
 
 # 2040 population density raster (scaled) - for future projections, not initial model run
 pop40_res <- crop(raster("./Data/CMAP_PHH40.tif"), study_extent)
@@ -155,9 +161,11 @@ total_veg <- (covs2[,"patch_total_veg"] - mean(covs2[,"patch_total_veg"]))/sd(co
 # water present
 water <- covs2[,"water_present"]
 # patch size (scaled)
-size <- (covs2[,"patch_size"] - mean(covs2[,"patch_size"]))/sd(covs2[,"patch_size"])
+size_km <- log(covs2[,"patch_size"]/1000000) # log transform to remove long right tail
+size <- (size_km - mean(size_km))/sd(size_km)
 # population density 2010 (scaled)
-pop10 <- (covs2[,"CMAP_pop10_dens"] - mean(covs2[,"CMAP_pop10_dens"]))/sd(covs2[,"CMAP_pop10_dens"])
+pop_10_log <- log(covs2[,"CMAP_pop10_dens"]) # log transform to remove long right tail
+pop10 <- (pop_10_log - mean(pop_10_log))/sd(pop_10_log)
 # population density 2040 (scaled)
 pop40 <- (covs2[,"CMAP_pop40_dens"] - mean(covs2[,"CMAP_pop40_dens"]))/sd(covs2[,"CMAP_pop40_dens"])
 # data matrix
@@ -170,7 +178,7 @@ site_covs <- sitecovs2
 obs_covs <- season_vec
 r_covs <- res_covs
 disp_dist <- 100000
-n.cores <- 6
+n.cores <- 4
 iters <- 1000
 report <- 100
 monitor.z <- TRUE
