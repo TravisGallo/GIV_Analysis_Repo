@@ -16,7 +16,7 @@
 .Rproj
 
 # Workspace images
-.RData
+*.RData
 
 # produced vignettes
 vignettes/*.html
@@ -34,13 +34,13 @@ vignettes/*.pdf
 *.knit.md
 
 # Plotting files
-.png
-.jpg
+*.png
+*.jpg
 
 # GIS files
-.tif
-.shp
-.dbf
-.prj
-.qpj
-.shx
+*.tif
+*.shp
+*.dbf
+*.prj
+*.qpj
+*.shx
