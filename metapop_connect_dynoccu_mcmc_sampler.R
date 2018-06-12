@@ -114,7 +114,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   for(k in 2:nseason) {
     zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
     PrNotColonizedByNeighbor <- 1 - G*zkt
-    PrNotColonizedAtAll <- apply(PrNotColonizedByNeighbor[1:2,], 1, prod, na.rm=TRUE)
+    PrNotColonizedAtAll <- apply(PrNotColonizedByNeighbor, 1, prod, na.rm=TRUE)
     gamma[,k-1] <- 1 - PrNotColonizedAtAll
     psi[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] #Rescue effect
     z[,k] <- rbinom(nsite, 1, psi[,k])
@@ -250,7 +250,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.alpha1 <- dnorm(alpha[1], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.alpha1.cand) -
                             (ll.z.sum + prior.alpha1))) {
             alpha[1] <- alpha1.cand
@@ -261,7 +261,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close alpha[1] sampler
       
       ## Metropolis update for alpha[2]
@@ -293,7 +293,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.alpha2 <- dnorm(alpha[2], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.alpha2.cand) -
                             (ll.z.sum + prior.alpha2))) {
             alpha[2] <- alpha2.cand
@@ -304,7 +304,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler for alpha[2]
     
       ## Metropolis update for alpha[3]
@@ -335,7 +335,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.alpha3 <- dnorm(alpha[3], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.alpha3.cand) -
                             (ll.z.sum + prior.alpha3))) {
             alpha[3] <- alpha3.cand
@@ -346,7 +346,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler for alpha[3]
     
       ## Metropolis update for b0.gam - part of gamma0 linear model
@@ -372,7 +372,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b0.gam <- dnorm(b0.gam, 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b0.gam.cand) -
                             (ll.z.sum + prior.b0.gam))) {
             b0.gam <- b0.gam.cand
@@ -383,7 +383,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b0.gam
     
       ## Metropolis update for b.gam[1] - part of gamma0 linear model
@@ -409,7 +409,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b1.gam <- dnorm(b.gam[1], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b1.gam.cand) -
                             (ll.z.sum + prior.b1.gam))) {
             b.gam[1] <- b1.gam.cand
@@ -420,7 +420,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b.gam[1]
     
       ## Metropolis update for b.gam[2] - part of gamma0 linear model
@@ -446,7 +446,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b2.gam <- dnorm(b.gam[2], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b1.gam.cand) -
                             (ll.z.sum + prior.b1.gam))) {
             b.gam[2] <- b2.gam.cand
@@ -457,7 +457,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b.gam[2]
     
       ## Metropolis update for b.gam[3] - part of gamma0 linear model
@@ -483,7 +483,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b3.gam <- dnorm(b.gam[3], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+       
           if(runif(1) < exp((ll.z.sum.cand + prior.b3.gam.cand) -
                             (ll.z.sum + prior.b3.gam))) {
             b.gam[3] <- b3.gam.cand
@@ -494,7 +494,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b.gam[3]
     
       ## Metropolis update for b.gam[4] - part of gamma0 linear model
@@ -520,7 +520,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b4.gam <- dnorm(b.gam[4], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b4.gam.cand) -
                             (ll.z.sum + prior.b4.gam))) {
             b.gam[4] <- b4.gam.cand
@@ -531,7 +531,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler for b.gam[4]
     
     ## Metropolis update for sigma
@@ -554,7 +554,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
           prior.sigma <- dgamma(sigma, 0.001, 0.001)
           # update
           ll.z.sum.cand <- sum(ll.z.cand)
-          if(!is.infinite(ll.z.sum.cand)){
+          
             if(runif(1) < exp((ll.z.sum.cand + prior.sigma.cand) -
                               (ll.z.sum + prior.sigma))) {
               sigma <- sigma.cand
@@ -564,7 +564,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
               ll.z <- ll.z.cand
               ll.z.sum <- ll.z.sum.cand
             }
-          }
+          
         }
       } # close sampler for sigma
     
@@ -586,7 +586,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b0.psi1 <- dnorm(b0.psi1, 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b0.psi1.cand) -
                             (ll.z.sum + prior.b0.psi1))) {
             b0.psi1 <- b0.psi1.cand
@@ -595,7 +595,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # Close sampler for b0.psi1
     
     ## Metropolis update for b.psi1[1] - part of linear predictor for initial occupancy
@@ -617,7 +617,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b1.psi1 <- dnorm(b.psi1[1], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b1.psi1.cand) -
                             (ll.z.sum + prior.b1.psi1))) {
             b.psi1[1] <- b1.psi1.cand
@@ -626,7 +626,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # Close sampler for b.psi[1]
     
     ## Metropolis update for b.psi1[2] - part of linear predictor for initial occupancy
@@ -648,7 +648,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b2.psi1 <- dnorm(b.psi1[2], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b2.psi1.cand) -
                             (ll.z.sum + prior.b2.psi1))) {
             b.psi1[2] <- b2.psi1.cand
@@ -657,7 +657,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler for b.psi1[2]
     
     ## Metropolis update for b.psi1[3] - part of linear predictor for initial occupancy
@@ -679,7 +679,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b3.psi1 <- dnorm(b.psi1[3], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+       
           if(runif(1) < exp((ll.z.sum.cand + prior.b3.psi1.cand) -
                             (ll.z.sum + prior.b3.psi1))) {
             b.psi1[3] <- b3.psi1.cand
@@ -688,7 +688,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler for b.psi1[3]
     
     ## Metropolis update for b0.eps - part of the linear predictor for epsilon
@@ -714,7 +714,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b0.eps <- dnorm(b0.eps, 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+       
           if(runif(1) < exp((ll.z.sum.cand + prior.b0.eps.cand) -
                             (ll.z.sum + prior.b0.eps))) {
             b0.eps <- b0.eps.cand
@@ -723,7 +723,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b0.eps
    
     ## Metropolis update for b.eps[1] - part of the linear predictor for epsilon
@@ -749,7 +749,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b1.eps <- dnorm(b.eps[1], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b1.eps.cand) -
                             (ll.z.sum + prior.b1.eps))) {
             b.eps[1] <- b1.eps.cand
@@ -758,7 +758,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b.eps[1]
     
     ## Metropolis update for b.eps[2] - part of the linear predictor for epsilon
@@ -784,7 +784,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b2.eps <- dnorm(b.eps[2], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b2.eps.cand) -
                             (ll.z.sum + prior.b2.eps))) {
             b.eps[2] <- b2.eps.cand
@@ -793,7 +793,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b.eps[2]
     
     ## Metropolis update for b.eps[3] - part of the linear predictor for epsilon
@@ -819,7 +819,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b3.eps <- dnorm(b.eps[3], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b3.eps.cand) -
                             (ll.z.sum + prior.b3.eps))) {
             b.eps[3] <- b3.eps.cand
@@ -828,7 +828,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b.eps[3]
     
     ## Metropolis update for b.eps[4] - part of the linear predictor for epsilon
@@ -854,7 +854,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b4.eps <- dnorm(b.eps[4], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+       
           if(runif(1) < exp((ll.z.sum.cand + prior.b4.eps.cand) -
                             (ll.z.sum + prior.b4.eps))) {
             b.eps[4] <- b4.eps.cand
@@ -863,7 +863,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b.eps[4]
       
     ## Metropolis update for b.eps[5] - part of the linear predictor for epsilon
@@ -889,7 +889,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b5.eps <- dnorm(b.eps[5], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b5.eps.cand) -
                             (ll.z.sum + prior.b5.eps))) {
             b.eps[5] <- b5.eps.cand
@@ -898,7 +898,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b.eps[5]
 
     ## Metropolis update for b.eps[6] - part of the linear predictor for epsilon
@@ -924,7 +924,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b6.eps <- dnorm(b.eps[6], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b6.eps.cand) -
                             (ll.z.sum + prior.b6.eps))) {
             b.eps[6] <- b6.eps.cand
@@ -933,7 +933,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b.eps[6]
     
     ## Metropolis update for b.eps[7] - part of the linear predictor for epsilon
@@ -959,7 +959,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b7.eps <- dnorm(b.eps[7], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+       
           if(runif(1) < exp((ll.z.sum.cand + prior.b7.eps.cand) -
                             (ll.z.sum + prior.b7.eps))) {
             b.eps[7] <- b7.eps.cand
@@ -968,7 +968,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b.eps[7]
     
     ## Metropolis update for b.eps[8] - part of the linear predictor for epsilon
@@ -994,7 +994,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         prior.b8.eps <- dnorm(b.eps[8], 0, 2, log=TRUE)
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
-        if(!is.infinite(ll.z.sum.cand)){
+        
           if(runif(1) < exp((ll.z.sum.cand + prior.b8.eps.cand) -
                             (ll.z.sum + prior.b8.eps))) {
             b.eps[8] <- b8.eps.cand
@@ -1003,7 +1003,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.z <- ll.z.cand
             ll.z.sum <- ll.z.sum.cand
           }
-        }
+        
       } # close sampler b.eps[8]
     
     ## Metropolis update for z
@@ -1062,8 +1062,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
               ll.z2 <- sum(ll.z[,k+1])
               ll.z2.cand <- sum(ll.z.cand[,k+1])
             }
-            if(!is.infinite(sum(ll.z, ll.z.cand, ll.z2, ll.z2.cand, ll.y.cand.tmp, 
-                                ll.y.tmp, na.rm=TRUE))){
+            
               if(runif(1) < exp((sum(ll.y.cand.tmp, na.rm=TRUE) +
                                  ll.z.cand[i,k] + ll.z2.cand) -
                                 (ll.y.tmp + ll.z[i,k] + ll.z2))) {
@@ -1079,7 +1078,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
                 }
                 zkup[k] <- zkup[k] + 1
               }
-            }
+            
           }
         }
         nz1 <- nz1+z
@@ -1100,7 +1099,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     
         ll.y.sum <- sum(ll.y, na.rm=TRUE)
         ll.y.sum.cand <- sum(ll.y.cand, na.rm=TRUE)
-        if(!is.infinite(ll.y.sum.cand)){
+        
           if(runif(1) < exp((ll.y.sum.cand + prior.a0.cand) -
                             (ll.y.sum + prior.a0))) {
               a0 <- a0.cand
@@ -1108,7 +1107,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
               ll.y <- ll.y.cand
               ll.y.sum <- ll.y.sum.cand
           }
-        }
+        
       } # close sampler a0
 
     #Update for season 2
@@ -1127,7 +1126,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         
         ll.y.sum <- sum(ll.y, na.rm=TRUE)
         ll.y.sum.cand <- sum(ll.y.cand, na.rm=TRUE)
-        if(!is.infinite(ll.y.sum.cand)){
+        
           if(runif(1) < exp((ll.y.sum.cand + prior.season2.cand) -
                             (ll.y.sum + prior.season2))) {
             season <- season2.cand.vec
@@ -1135,7 +1134,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.y <- ll.y.cand
             ll.y.sum <- ll.y.sum.cand
           }
-        }
+        
       } # close sampler season2
 
     # Update for season 3
@@ -1154,7 +1153,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         
         ll.y.sum <- sum(ll.y, na.rm=TRUE)
         ll.y.sum.cand <- sum(ll.y.cand, na.rm=TRUE)
-        if(!is.infinite(ll.y.sum.cand)){
+        
           if(runif(1) < exp((ll.y.sum.cand + prior.season3.cand) -
                             (ll.y.sum + prior.season3))) {
             season <- season3.cand.vec
@@ -1162,7 +1161,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.y <- ll.y.cand
             ll.y.sum <- ll.y.sum.cand
           }
-        }
+        
       } # close sampler season3
     
     # Update for season 4
@@ -1181,7 +1180,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
         
         ll.y.sum <- sum(ll.y, na.rm=TRUE)
         ll.y.sum.cand <- sum(ll.y.cand, na.rm=TRUE)
-        if(!is.infinite(ll.y.sum.cand)){
+       
           if(runif(1) < exp((ll.y.sum.cand + prior.season4.cand) -
                             (ll.y.sum + prior.season4))) {
             season <- season4.cand.vec
@@ -1189,7 +1188,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
             ll.y <- ll.y.cand
             ll.y.sum <- ll.y.sum.cand
           }
-        }
+        
       } # close sampler season4
     } # close subiter loop
 

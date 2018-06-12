@@ -92,7 +92,7 @@ pop10_coarse <- aggregate(pop10_res, fact=4, fun=mean)
 # add 0.001 to all population values to remove 0's
 values(pop10_coarse) <- values(pop10_coarse) + 0.001
 # log transform to remove large right tale and scale mean 0
-pop10_scale <- scale(log(pop10_tranform))
+pop10_scale <- scale(log(pop10_coarse))
 
 # 2040 population density raster (scaled) - for future projections, not initial model run
 pop40_res <- crop(raster("./Data/CMAP_PHH40.tif"), study_extent)
@@ -188,7 +188,7 @@ plot.z <- TRUE
 tune <- c(0.3, 0.3, 0.3, # alpha coefficients
           0.5, 0.5, 0.5, 0.5, 0.5, # gamma coefficients
           0.3, # sigma
-          0.5, 0.5, 0.5, 0.5, # psi0.5 coefficients
+          0.5, 0.5, 0.5, 0.5, # psi1 coefficients
           0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, # epsilon coefficients
           0.5, 0.5, 0.5, 0.5 #a0 and season parameters (detection)
           )
