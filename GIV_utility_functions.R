@@ -153,7 +153,8 @@ costDistance_mod <- function(x, fromCoords, toCoords, dist.cutoff, n.cores) {
   toCoords.loc <- vector("list", nrow(toCoords)) # location of each retained coordinate in the distance matrix
   toCoords.list <- vector("list", nrow(toCoords)) # list of coordinates within dispersal distance of each individual point (list in order of points)
   for(j in 1:nrow(toCoords)){
-    toCoords.loc[[j]] <- which(sqrt((fromCoords[j,1]-fromCoords[,1])^2 + (fromCoords[j,2]-fromCoords[,2])^2) < dist.cutoff)
+    toCoords.loc[[j]] <- which(sqrt((fromCoords[j,1]-fromCoords[,1])^2 + 
+                                      (fromCoords[j,2]-fromCoords[,2])^2) < dist.cutoff)
     toCoords.list[[j]] <- toCoords[toCoords.loc[[j]],]
   }
   
@@ -178,12 +179,15 @@ costDistance_mod <- function(x, fromCoords, toCoords, dist.cutoff, n.cores) {
   # parallel through each fromCell and its respective list of toCells
   cl <- makeCluster(n.cores) # setup parallel backend to use x number of cores
   registerDoParallel(cl) # register backend
-  costDist <- foreach(i=1:length(fromCells), .packages=c("gdistance")) %dopar% {
-    shortestPaths <- shortest.paths(adjacencyGraph, v=fromCells[i], to=toCells[[i]], mode="out", algorithm="dijkstra")
-    rownames(shortestPaths) <- rownames(fromCoords)[i]
-    colnames(shortestPaths) <- rownames(toCoords.list[[i]])
-    return(shortestPaths)
-  }
+  costDist <- foreach(i=1:length(fromCells), .export=c("adjacencyGraph", "fromCells", "toCells"), 
+                      .packages=c("gdistance")) %dopar% {
+                        shortestPaths <- shortest.paths(adjacencyGraph, v=fromCells[i], 
+                                                        to=toCells[[i]], mode="out",
+                                                        algorithm="dijkstra")
+                        rownames(shortestPaths) <- rownames(fromCoords)[i]
+                        colnames(shortestPaths) <- rownames(toCoords.list[[i]])
+                        return(shortestPaths)
+                        }
   stopCluster(cl) #stop cluster
   
   D_mat <- matrix(NA, nrow(fromCoords), nrow(fromCoords))

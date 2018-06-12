@@ -1,6 +1,6 @@
 
 ## MCMC algorithm
-dynroccH <- function(y,            # nsampled x nseason matrix of detection data*
+occuConn <- function(y,            # nsampled x nseason matrix of detection data*
                      j,            # nsampled x nseason matrix of sampling occasions
                      x,            # nSites x 2 matrix of site coordinates. Note that nSampled will usually be <nSites*
                      disp_dist,    # dispersal distance
@@ -11,15 +11,10 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
                      tune,         # Tuning order: sigma,gamma0.i,gamma0.s,gamma0.p,eps.i,eps.s,eps.p,
                                    #               beta0,beta1,beta2,alpha[1],alpha[2] (12 in total)
                      param_mon,    # character vector of parameters to monitor
-                    
-                    inits=NULL,    # until you run algorithm, inits are based on what is given.
-                    zProp=c("ind","vec"), # Update z matrix by either proposing z(i,k) or z(,k), respectively
-                    zProbs=NULL,   # matrix of proposal probs use if zProp="vec"
-                    monitor.z=FALSE, # store each iteration of the z matrix?
-                    report=0,      # Only report progress if >0
-                    plot.z=FALSE,  # Plot the latent presence-absence state (if report>0)
-                    tol=0,         # This will reject a proposal of z(i,k)=1 if mu(i,k-1)<tol
-                    n.cores)       # number of cores for parallel 
+                     monitor.z=FALSE, # store each iteration of the z matrix?
+                     report=0,      # Only report progress if >0
+                     plot.z=FALSE,  # Plot the latent presence-absence state (if report>0)
+                     n.cores)       # number of cores for parallel 
 {
   ## Dimensions
   nsite <- nrow(x) # Number of possible sites instead of only the sites sampled
@@ -39,8 +34,10 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # colonization
   b0.gam <- rnorm(1,0,0.5) # intercept
   b.gam <- rnorm(4,0,0.5) # 4 covariates
-  gamma0 <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + b.gam[2]*site_covs[,"park"] + 
-                     b.gam[3]*site_covs[,"cem"] + b.gam[4]*site_covs[,"golf"])
+  gamma0 <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + 
+                     b.gam[2]*site_covs[,"park"] + 
+                     b.gam[3]*site_covs[,"cem"] + 
+                     b.gam[4]*site_covs[,"golf"])
   sigma <- runif(1,1,10)
   # extinction
   b0.eps <-  rnorm(1, 0, 0.5) # intercept
@@ -135,20 +132,21 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   nz1 <- z
   
   # STARTING UPDATING PROCESS
-  #  Objects to hold posterior samples
-  # The parameters to estimate and zk for 13 seasons
-  param_mon <- c("alpha[1]","alpha[2]", "alpha[3]", "sigma", "b0.gam", 
-                 "b.gam[1]", "b.gam[2]", "b.gam[3]", "b.gam[4]", "b0.psi1", 
-                 "b.psi1[1]", "b.psi1[3]", "b.psi1[3]", "b0.eps", "b.eps[1]", 
-                 "b.eps[2]", "b.eps[3]", "b.eps[4]", "b.eps[5]", "b.eps[6]", 
-                 "b.eps[7]", "b.eps[8]", "a0", "season[2]","season[3]", 
-                 "season[4]", "zk", "deviance")
+  # Objects to hold posterior samples
+  
   # The number of parameters to estimate and zk for 13 seasons
   npar <- length(param_mon) + nseason-1
 
   # Holds posterior samples
   samples <- matrix(NA, iters, npar)
-  colnames(samples) <- param_mon
+  colnames(samples) <- c(paste0("alpha",1:length(alpha)),
+                                "sigma",
+                                "b0.gam", paste0("b.gam",1:length(b.gam)),
+                                "b0.psi1", paste0("b.psi1.",1:length(b.psi1)), 
+                                "b0.eps", paste0("b.eps",1:length(b.eps)),
+                                "a0", paste0("season",2:4), 
+                                paste0("zk",1:nseason),
+                                "deviance")
   
   # monitor z estimates for each patch
   zk <- matrix(NA, nsite, iters)
@@ -167,8 +165,8 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
   # 888888888888888888888888888888888888888888888888888888888
   if(reportit) {
       cat("iter 1\n")
-      cat("    theta =", round(c(alpha, b0.psi1, b.psi1, b0.gam, b.gam, 
-                                 sigma, b0.eps, b.eps, a0, season[2:4], zk), 5),
+      cat("    params =", round(c(alpha, b0.psi1, b.psi1, b0.gam, b.gam, 
+                                 sigma, b0.eps, b.eps, a0, season[2:4]), 5),
           "\n")
       cat("    z[k] =", round(colSums(z), 2), "\n")
       cat("    sum_ll.z =", round(sum(ll.z), 2), "\n")
@@ -183,7 +181,7 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
       }
   }
 
-  inf_false <- 0
+  
   # START SAMPLING FROM POSTERIOR
   for(s in 1:iters) {
     
@@ -1194,7 +1192,6 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
 
     zk <- colSums(z)
     
-
     samples[s,] <- c(alpha, sigma, b0.gam, b.gam, b0.psi1, 
                      b.psi1, b0.eps, b.eps, a0, season[2:4], zk=zk, 
                      deviance=-2*ll.y.sum)
@@ -1204,11 +1201,11 @@ dynroccH <- function(y,            # nsampled x nseason matrix of detection data
     }
   }
 
-  final.state <- list(z=z, D=D, samples=samples[s,])
-  library(coda)
-  return(list(samples=samples, final.state=final.state,
-              zK=zK, zA=zA, Ez=nz1/nIter,
+  final_state <- list(z=z, D=D, samples=samples[s,])
+  
+  return(list(samples=samples, final_state=final_state,
+              zK=zK, zA=zA, Ez=nz1/iters,
               seed=.Random.seed))
 }
 
-dynroccHC <- cmpfun(dynroccH)
+occuConnC <- cmpfun(occuConn)
