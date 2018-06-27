@@ -55,7 +55,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
   a0 <- rnorm(1, 0, 0.5)
   season <- rnorm(4,0 , 0.5)
   season[1] <- 0
-  p <- plogis(a0 + season[season_vec])
+  p <- plogis(a0 + season[obs_covs])
   # need to run through the model to generate starting values for z[,k-1] based off z[,1] starting values,
   # psi, gamma, and likelihoods for z and y
   gamma <- matrix(NA, nsite, nseason-1)
@@ -77,20 +77,17 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
   # create resistance surface
   cost <- exp(alpha[1]*r_covs[[1]] + 
               alpha[2]*r_covs[[2]] + 
-              alpha[3]*r_covs[[3]] )
+              alpha[3]*r_covs[[3]])
   
-  # calculate conductances among neighbors 
-  #  create transition matrix - 
-  #  here we convert our cost to conductance by doing 1/resistance
-  tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
+  cl <- makeCluster(detectCores())
+  # use modified function that creates transition matrix, corrects for diagnols and
+    # calculates the ecological distance matrix in parallel
+  D <- distanceMatrix(cost, directions=16, symm = TRUE,
+                      fromCoords=test_data$coords, toCoords=test_data$coords,
+                      dist.cutoff=disp_dist, cluster=cl)
   
-  # adjust diag. conductances
-  tr1CorrC <- geoCorrection(tr1, type="c", multpl = FALSE, scl = FALSE) 
-  
-  # calculate the ecological distance matrix in parallel
   # divide by 1000 to scale to kilometers from meters
-  D <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, 
-                        dist.cutoff=disp_dist, n.cores)/1000
+  D <- D/1000
   G <- gamma0*exp(-D^2/(2*sigma^2))
   G[is.na(G)] <- 0
   
@@ -160,9 +157,6 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       zA <- array(NA, c(nsite, nseason, iters))
   }
   # report the first iteration of starting values
-  # *88888888888888888888888888888888888888888888888888888888
-  # MF: UPDATE THETA PARAMETERS TO REPORT
-  # 888888888888888888888888888888888888888888888888888888888
   if(reportit) {
       cat("iter 1\n")
       cat("    params =", round(c(alpha, b0.psi1, b.psi1, b0.gam, b.gam, 
@@ -224,13 +218,13 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
         cost <- exp(alpha1.cand*r_covs[[1]] + # 1-NDVI
                     alpha[2]*r_covs[[2]] +    # population density
                     alpha[3]*r_covs[[3]])     # patch indicator
-        # calculate conductances among neighbors
-        tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
-        # adjust diag. conductances
-        tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE, scl=FALSE) 
+        
         # calculate the ecological distance matrix in parallel
-        D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, 
-                                   disp_dist, n.cores)/1000
+        # divide by 1000 to scale to km
+        # note that transition function is 1/mean(x)
+        D.cand <- distanceMatrix(cost, directions=16, symm = TRUE,
+                                 fromCoords=test_data$coords, toCoords=test_data$coords,
+                                 dist.cutoff=disp_dist, cluster=cl)/1000
         G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's = distances too far to colonize
         G.cand[is.na(G.cand)] <- 0 # change NA's to 0
         # model
@@ -267,13 +261,12 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
         alpha2.cand <- rnorm(1, alpha[2], tune[2])
         # create resistance surface
         cost <- exp(alpha[1]*r_covs[[1]] + alpha2.cand*r_covs[[2]] + alpha[3]*r_covs[[3]]) 
-        # calculate conductances among neighbors
-        tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16)
-        # adjust diag.conductances
-        tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE)
         # calculate the ecological distance matrix in parallel
-        D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, 
-                                   disp_dist, n.cores)/1000
+        # divide by 1000 to scale to km
+        # note that transition function is 1/mean(x)
+        D.cand <- distanceMatrix(cost, directions=16, symm = TRUE,
+                                 fromCoords=test_data$coords, toCoords=test_data$coords,
+                                 dist.cutoff=disp_dist, cluster=cl)/1000
         G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's are distances that were too far to colonize
         G.cand[is.na(G.cand)] <- 0 # change NA's to 0
         # model
@@ -310,12 +303,12 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
         alpha3.cand <- rnorm(1, alpha[3], tune[3])
         # create resistance surface
         cost <- exp(alpha[1]*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha3.cand*r_covs[[3]])
-        # calculate conductances among neighbors
-        tr1 <- transition(cost, transitionFunction=function(x) 1/mean(x), directions=16) 
-        tr1CorrC <- geoCorrection(tr1, type="c", multpl=FALSE,scl=FALSE) #adjust diag.conductances
         # calculate the ecological distance matrix in parallel
-        D.cand <- costDistance_mod(tr1CorrC, fromCoords=x, toCoords=x, 
-                                  disp_dist, n.cores)/1000
+        # divide by 1000 to scale to km
+        # note that transition function is 1/mean(x)
+        D.cand <- distanceMatrix(cost, directions=16, symm = TRUE,
+                                 fromCoords=test_data$coords, toCoords=test_data$coords,
+                                 dist.cutoff=disp_dist, cluster=cl)/1000
         G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's are distances that were too far to colonize
         G.cand[is.na(G.cand)] <- 0 # change NA's to 0
         # model
@@ -445,8 +438,8 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
         # update
         ll.z.sum.cand <- sum(ll.z.cand)
         
-          if(runif(1) < exp((ll.z.sum.cand + prior.b1.gam.cand) -
-                            (ll.z.sum + prior.b1.gam))) {
+          if(runif(1) < exp((ll.z.sum.cand + prior.b2.gam.cand) -
+                            (ll.z.sum + prior.b2.gam))) {
             b.gam[2] <- b2.gam.cand
             gamma0 <- gamma0.cand
             G <- G.cand
@@ -1085,7 +1078,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     ## Metropolis update for a0 - part of detection probability
       if(sampling_order[subiter] == 23){
         a0.cand<-rnorm(1, a0, tune[23])
-        p.cand <- plogis(a0.cand + season[season_vec])
+        p.cand <- plogis(a0.cand + season[obs_covs])
         p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
         p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
     
@@ -1112,7 +1105,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 24){
         season2.cand.vec <- season
         season2.cand.vec[2] <- rnorm(1, season[2], tune[24])
-        p.cand <- plogis(a0 + season2.cand.vec[season_vec])
+        p.cand <- plogis(a0 + season2.cand.vec[obs_covs])
         p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
         p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
         
@@ -1139,7 +1132,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 25){
         season3.cand.vec <- season
         season3.cand.vec[3] <- rnorm(1, season[3], tune[25])
-        p.cand <- plogis(a0 + season3.cand.vec[season_vec])
+        p.cand <- plogis(a0 + season3.cand.vec[obs_covs])
         p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
         p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
         
@@ -1166,7 +1159,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 26){
         season4.cand.vec <- season
         season4.cand.vec[4] <- rnorm(1, season[4], tune[26])
-        p.cand <- plogis(a0 + season4.cand.vec[season_vec])
+        p.cand <- plogis(a0 + season4.cand.vec[obs_covs])
         p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
         p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
         
@@ -1195,17 +1188,21 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     samples[s,] <- c(alpha, sigma, b0.gam, b.gam, b0.psi1, 
                      b.psi1, b0.eps, b.eps, a0, season[2:4], zk=zk, 
                      deviance=-2*ll.y.sum)
-    zK[,s] <- z[,nseason]
+    
+    #zK[,s] <- z[,nseason]
     if(monitor.z){
         zA[,,s] <- z
     }
   }
-
+  
+  # stop cluster
+  stopCluster(cl)
+  
   final_state <- list(z=z, D=D, samples=samples[s,])
   
+  # remember to put zK back if we keep it
   return(list(samples=samples, final_state=final_state,
-              zK=zK, zA=zA, Ez=nz1/iters,
-              seed=.Random.seed))
+              zA=zA, Ez=nz1/iters, seed=.Random.seed))
 }
 
 occuConnC <- cmpfun(occuConn)

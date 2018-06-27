@@ -1,6 +1,7 @@
 #######################################################################################
-# Spatial Occupancy Model for COYOTE. Written by Travis Gallo and Mason Fidino
-#  Modified from Paige Howell, Richard Chandler
+# Data set up and function run for Spatial Occupancy Model for COYOTE. 
+# Written by Travis Gallo and Mason Fidino
+# Modified from Paige Howell, Richard Chandler
 #######################################################################################
 
 # load internal functions. Assumes this script is in your working directory.
@@ -130,7 +131,7 @@ res_covs <- as.list(c(ndvi=ndvi_scale, pop=pop10_scale, patch=patch_indicator))
 # Test data
 
 # creat small space to test
-test_extent <- extent(sites_sampled) + 2000
+test_extent <- extent(sites_sampled) + 5000
 
 # crop raster and patches shape for practice
 ndvi_crop <- crop(ndvi_scale, test_extent)
@@ -171,13 +172,29 @@ pop40 <- (covs2[,"CMAP_pop40_dens"] - mean(covs2[,"CMAP_pop40_dens"]))/sd(covs2[
 # data matrix
 sitecovs2 <- cbind(tree, total_veg, water, size, pop10, park, golf, cem)
 
+test_data <- list(coords=coords,
+                  y_mat=y_mat,
+                  j_mat=j_mat,
+                  sitecovs2 = sitecovs2,
+                  season_vec = season_vec,
+                  res_covs=res_covs)
+
+# save so that we can load test data into a smaller environment
+saveRDS(test_data, "2018-06-14_occusampler_testdata.RDS")
+
+# read back in test data and load needed functions
+test_data <- readRDS("2018-06-14_occusampler_testdata.RDS")
+source("GIV_utility_functions.R")
+source("metapop_connect_dynoccu_mcmc_sampler.R")
+
+# run sampler
 test <- occuConnC(
-  x = coords,
-  y = y_gen,
-  j = j_mat,
-  site_covs = sitecovs2,
-  obs_covs = season_vec,
-  r_covs = res_covs,
+  x = test_data$coords,
+  y = test_data$y_mat,
+  j = test_data$j_mat,
+  site_covs = test_data$sitecovs2,
+  obs_covs = test_data$season_vec,
+  r_covs = test_data$res_covs,
   disp_dist = 100000,
   n.cores = 4,
   iters = 5,
@@ -193,7 +210,7 @@ test <- occuConnC(
             0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, # epsilon coefficients
             0.2, 0.2, 0.2, 0.2 #a0 and season parameters (detection)
             ),
-  param_mon <- c("alpha[1]","alpha[2]", "alpha[3]", "sigma", "b0.gam", 
+  param_mon = c("alpha[1]","alpha[2]", "alpha[3]", "sigma", "b0.gam", 
                  "b.gam[1]", "b.gam[2]", "b.gam[3]", "b.gam[4]", "b0.psi1", 
                  "b.psi1[1]", "b.psi1[3]", "b.psi1[3]", "b0.eps", "b.eps[1]", 
                  "b.eps[2]", "b.eps[3]", "b.eps[4]", "b.eps[5]", "b.eps[6]", 
