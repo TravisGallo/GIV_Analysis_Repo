@@ -173,11 +173,9 @@ distanceMatrix <- function(x, transitionFunction, directions, symm, fromCoords, 
   }
   transitionMatrix(tr) <- transitionMatr
   matrixValues(tr) <- "conductance"
-  
   ### geocorrect the transition matrix
   # adjust diag. conductances
   trCorr <- geoCorrection(tr, type="c", multpl = FALSE, scl = FALSE)
-  
   ### modified costdistance function
   ## create a list of sites only within dispersal distance (Euclidian) from each site
   toCoords.loc <- vector("list", nrow(toCoords)) # location of each retained coordinate in the distance matrix
@@ -187,21 +185,22 @@ distanceMatrix <- function(x, transitionFunction, directions, symm, fromCoords, 
                                       (fromCoords[j,2]-fromCoords[,2])^2) < dist.cutoff)
     toCoords.list[[j]] <- toCoords[toCoords.loc[[j]],]
   }
-  
   # indicates which cells the fromCoords are in
-  fromCells <- cellFromXY(trCorr, fromCoords) 
+    # remove duplicates with unique function
+  fromCells <- cellFromXY(trCorr, fromCoords)
   
   # have to set up toCells a bit different
-  toCells <- vector("list", nrow(fromCoords)) # list to hold the toCells for each individual fromCell
+  toCells <- toCells_gdist <- vector("list", nrow(fromCoords)) # list to hold the toCells for each individual fromCell
   # indicate the toCells, but keep them within the list to hold true to the dispersal cutoff
   for(i in 1:length(toCoords.list)){
     toCells[[i]] <- cellFromXY(trCorr, toCoords.list[[i]])
+    toCells_gdist[[i]] <- unique(toCells[[i]])
   }
   
   # make a list object that can be run through parLapply
   cell_list <- vector("list", length(fromCells))
   for(i in 1:length(cell_list)){
-    cell_list[[i]] <- list(fromCells[i],toCells[[i]])
+    cell_list[[i]] <- list(fromCells[i],toCells_gdist[[i]])
   }
   
   # make the transition matrix an object that igraph can read
@@ -218,16 +217,22 @@ distanceMatrix <- function(x, transitionFunction, directions, symm, fromCoords, 
                                                to = x[[2]],
                                                mode = "out",
                                                algorithm = "dijkstra") }
+  
   # export function and variables to clusters
-  clusterExport(cl=cluster, list("adjacencyGraph", "shortestPaths", "shortest.paths"),
+  clusterExport(cl=cluster, list("adjacencyGraph", "shortestPaths", 
+                                 "shortest.paths"),
                 envir=environment())
   # use shortestPaths function in parallel
   costDist <- parLapply(cl=cluster,cell_list, shortestPaths)
-  
+  # remove exported variables to make room for next run
+  clusterEvalQ(cluster, rm(list=ls()))
   # turn distances into full distance matrix
   D_mat <- matrix(NA, nrow(fromCoords), nrow(fromCoords))
   for(i in 1:nrow(fromCoords)){
-    D_mat[toCoords.loc[[i]],i] <- costDist[[i]]
+    # create a vector so that removed cells are giving same value as its matching cell
+    D_mat[toCoords.loc[[i]],i] <- left_join(x=data.frame(to=toCells[[i]]),
+                                            y=data.frame(to=toCells_gdist[[i]],
+                                                         val=costDist[[i]][1,]), by="to")$val
   }
   rownames(D_mat) <- rownames(fromCoords)
   colnames(D_mat) <- rownames(fromCoords)

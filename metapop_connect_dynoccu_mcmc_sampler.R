@@ -16,6 +16,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
                      plot.z=FALSE,  # Plot the latent presence-absence state (if report>0)
                      n.cores)       # number of cores for parallel 
 {
+  
   ## Dimensions
   nsite <- nrow(x) # Number of possible sites instead of only the sites sampled
   nseason <- ncol(y)
@@ -27,10 +28,10 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
   
   ## initial values for sampler
   # resistence
-  alpha <-   rgamma(3, 1, 4)
+  alpha <- rgamma(3, 1, 4)
   # initial occupancy
   b0.psi1 <- rnorm(1, 0, 0.5)
-  b.psi1 <-  rnorm(3, 0, 0.5)
+  b.psi1 <- rnorm(3, 0, 0.5)
   # colonization
   b0.gam <- rnorm(1,0,0.5) # intercept
   b.gam <- rnorm(4,0,0.5) # 4 covariates
@@ -40,8 +41,8 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
                      b.gam[4]*site_covs[,"golf"])
   sigma <- runif(1,1,10)
   # extinction
-  b0.eps <-  rnorm(1, 0, 0.5) # intercept
-  b.eps <-   rnorm(8, 0, 0.5) # 8 covariates
+  b0.eps <- rnorm(1, 0, 0.5) # intercept
+  b.eps <- rnorm(8, 0, 0.5) # 8 covariates
   epsilon <- plogis(b0.eps + b.eps[1]*site_covs[ ,"tree"] + 
                              b.eps[2]*site_covs[ ,"total_veg"] + 
                              b.eps[3]*site_covs[ ,"size"] + 
@@ -64,10 +65,10 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
                            b.psi1[3]*site_covs[,"golf"])
   
   # psi matrix holds all occupancy probabilities in t = 1 and then the 
-  #  associated colonization / extinction probabilities at t > 1.
+  # associated colonization / extinction probabilities at t > 1.
   psi <- matrix(NA, nsite, nseason)
   
-  #  occupancy prob season 1 from initial values
+  # occupancy prob season 1 from initial values
   psi[,1] <- psi1
   
   # log likelihood matrices for latent and observed states
@@ -78,14 +79,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
   cost <- exp(alpha[1]*r_covs[[1]] + 
               alpha[2]*r_covs[[2]] + 
               alpha[3]*r_covs[[3]])
-  
-  cl <- makeCluster(detectCores())
+  # start cluster
+  cl <- makeCluster(getOption("mc.cores"))
+
   # use modified function that creates transition matrix, corrects for diagnols and
     # calculates the ecological distance matrix in parallel
   D <- distanceMatrix(cost, directions=16, symm = TRUE,
-                      fromCoords=test_data$coords, toCoords=test_data$coords,
+                      fromCoords=x, toCoords=x,
                       dist.cutoff=disp_dist, cluster=cl)
-  
   # divide by 1000 to scale to kilometers from meters
   D <- D/1000
   G <- gamma0*exp(-D^2/(2*sigma^2))
@@ -108,7 +109,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
   for(k in 2:nseason) {
     zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
     PrNotColonizedByNeighbor <- 1 - G*zkt
-    PrNotColonizedAtAll <- apply(PrNotColonizedByNeighbor, 1, prod, na.rm=TRUE)
+    PrNotColonizedAtAll <- parApply(cl,PrNotColonizedByNeighbor, 1, prod, na.rm=TRUE)
     gamma[,k-1] <- 1 - PrNotColonizedAtAll
     psi[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] #Rescue effect
     z[,k] <- rbinom(nsite, 1, psi[,k])
@@ -175,7 +176,6 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       }
   }
 
-  
   # START SAMPLING FROM POSTERIOR
   for(s in 1:iters) {
     
@@ -223,7 +223,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
         # divide by 1000 to scale to km
         # note that transition function is 1/mean(x)
         D.cand <- distanceMatrix(cost, directions=16, symm = TRUE,
-                                 fromCoords=test_data$coords, toCoords=test_data$coords,
+                                 fromCoords=x, toCoords=x,
                                  dist.cutoff=disp_dist, cluster=cl)/1000
         G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's = distances too far to colonize
         G.cand[is.na(G.cand)] <- 0 # change NA's to 0
@@ -265,7 +265,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
         # divide by 1000 to scale to km
         # note that transition function is 1/mean(x)
         D.cand <- distanceMatrix(cost, directions=16, symm = TRUE,
-                                 fromCoords=test_data$coords, toCoords=test_data$coords,
+                                 fromCoords=x, toCoords=x,
                                  dist.cutoff=disp_dist, cluster=cl)/1000
         G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's are distances that were too far to colonize
         G.cand[is.na(G.cand)] <- 0 # change NA's to 0
@@ -307,7 +307,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
         # divide by 1000 to scale to km
         # note that transition function is 1/mean(x)
         D.cand <- distanceMatrix(cost, directions=16, symm = TRUE,
-                                 fromCoords=test_data$coords, toCoords=test_data$coords,
+                                 fromCoords=x, toCoords=x,
                                  dist.cutoff=disp_dist, cluster=cl)/1000
         G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's are distances that were too far to colonize
         G.cand[is.na(G.cand)] <- 0 # change NA's to 0
@@ -1069,9 +1069,9 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
                 }
                 zkup[k] <- zkup[k] + 1
               }
-            
           }
         }
+        
         nz1 <- nz1+z
       } # close sampler z
     
