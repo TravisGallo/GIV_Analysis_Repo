@@ -36,6 +36,8 @@ vignettes/*.pdf
 # Plotting files
 *.png
 *.jpg
+*.jpeg
+*.tiff
 
 # GIS files
 *.tif
