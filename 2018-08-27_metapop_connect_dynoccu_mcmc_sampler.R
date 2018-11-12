@@ -1,30 +1,50 @@
 
 ## MCMC algorithm
-occuConn <- function(y,            # nsampled x nseason matrix of detection data*
-                     jmat,            # nsampled x nseason matrix of sampling occasions
-                     coords,       # nSites x 2 matrix of site coordinates. Note that nSampled will usually be <nSites*
-                     disp_dist,    # dispersal distance
-                     r_covs,       # list of resistance covariate
-                     site_covs,    # site-level covariate
-                     obs_covs,     # observation-level covariate
-                     iters=10,     # MCMC iterations
-                     tune,         # Tuning order: sigma,gamma0.i,gamma0.s,gamma0.p,eps.i,eps.s,eps.p,
-                                   #               beta0,beta1,beta2,alpha[1],alpha[2] (12 in total)
-                     param_mon,    # character vector of parameters to monitor
-                     monitor.z=FALSE, # store each iteration of the z matrix?
-                     report=0,      # Only report progress if >0
-                     plot.z=FALSE,  # Plot the latent presence-absence state (if report>0)
-                     n.cores)       # number of cores for parallel 
-{
+
+  load("2018-08-27_occConnC_Data.RData")
+  
+  library(raster)
+  library(doParallel)
+  library(gdistance)
+  library(dplyr)
+  library(data.table)
+  
+  ## species specific settings
+  # dispersal distance of species
+  disp_dist = 50000
+  
+  ## some early settings for inspection
+  report = 100 # report every x amount of iterations
+  monitor.z = TRUE # track z
+  plot.z = TRUE # plot z with each report
+  
+  ## parameters for mcmc sample
+  # mcmc iterations
+  iters <- 5
+  # parameters to monitor
+  param_mon = c("alpha[1]","alpha[2]", "alpha[3]", "sigma", "b0.gam", 
+                "b.gam[1]", "b.gam[2]", "b.gam[3]", "b.gam[4]", "b0.psi1", 
+                "b.psi1[1]", "b.psi1[3]", "b.psi1[3]", "b0.eps", "b.eps[1]", 
+                "b.eps[2]", "b.eps[3]", "b.eps[4]", "b.eps[5]", "b.eps[6]", 
+                "b.eps[7]", "b.eps[8]", "a0", "season[2]","season[3]", 
+                "season[4]", "zk", "deviance")
+  # tuning parameters
+  tune = c(0.3, 0.3, 0.3, # alpha coefficients
+           0.3, 0.3, 0.3, 0.3, 0.3, # gamma coefficients
+           0.3, # sigma
+           0.3, 0.3, 0.3, 0.3, # psi1 coefficients
+           0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, # epsilon coefficients
+           0.2, 0.2, 0.2, 0.2 #a0 and season parameters (detection)
+  )
   
   ## Dimensions
-  nsite <- nrow(coords) # Number of possible sites instead of only the sites sampled
-  nseason <- ncol(y)
-  nsampled <- nrow(y)
+  nsite <- nrow(data$coords) # Number of possible sites instead of only the sites sampled
+  nseason <- ncol(data$y_mat)
+  nsampled <- nrow(data$y_mat)
   
   ## indicating real detections from data
   anyDetections <- matrix(FALSE, nsite, nseason)
-  anyDetections[1:nsampled,] <- as.numeric(y > 0)
+  anyDetections[1:nsampled,] <- as.numeric(data$y_mat > 0)
   
   ## initial values for sampler
   # resistence
@@ -35,34 +55,34 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
   # colonization
   b0.gam <- rnorm(1,0,0.5) # intercept
   b.gam <- rnorm(4,0,0.5) # 4 covariates
-  gamma0 <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + 
-                     b.gam[2]*site_covs[,"park"] + 
-                     b.gam[3]*site_covs[,"cem"] + 
-                     b.gam[4]*site_covs[,"golf"])
+  gamma0 <- plogis(b0.gam + b.gam[1]*data$sitecovs[,"size"] + 
+                     b.gam[2]*data$sitecovs[,"park"] + 
+                     b.gam[3]*data$sitecovs[,"cem"] + 
+                     b.gam[4]*data$sitecovs[,"golf"])
   sigma <- runif(1,1,10)
   # extinction
   b0.eps <- rnorm(1, 0, 0.5) # intercept
   b.eps <- rnorm(8, 0, 0.5) # 8 covariates
-  epsilon <- plogis(b0.eps + b.eps[1]*site_covs[ ,"tree"] + 
-                             b.eps[2]*site_covs[ ,"total_veg"] + 
-                             b.eps[3]*site_covs[ ,"size"] + 
-                             b.eps[4]*site_covs[ ,"pop10"] +
-                             b.eps[5]*site_covs[ ,"water"] +
-                             b.eps[6]*site_covs[ ,"park"] +
-                             b.eps[7]*site_covs[ ,"cem"] +
-                             b.eps[8]*site_covs[ ,"golf"] )
+  epsilon <- plogis(b0.eps + b.eps[1]*data$sitecovs[ ,"tree"] + 
+                             b.eps[2]*data$sitecovs[ ,"total_veg"] + 
+                             b.eps[3]*data$sitecovs[ ,"size"] + 
+                             b.eps[4]*data$sitecovs[ ,"pop10"] +
+                             b.eps[5]*data$sitecovs[ ,"water"] +
+                             b.eps[6]*data$sitecovs[ ,"park"] +
+                             b.eps[7]*data$sitecovs[ ,"cem"] +
+                             b.eps[8]*data$sitecovs[ ,"golf"] )
   # detection
   p <- rep(0, nseason)
   a0 <- rnorm(1, 0, 0.5)
   season <- rnorm(4,0 , 0.5)
   season[1] <- 0
-  p <- plogis(a0 + season[obs_covs])
+  p <- plogis(a0 + season[data$season_vec])
   # need to run through the model to generate starting values for z[,k-1] based off z[,1] starting values,
   # psi, gamma, and likelihoods for z and y
   gamma <- matrix(NA, nsite, nseason-1)
-  psi1 <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] +
-                           b.psi1[2]*site_covs[,"cem"]  +
-                           b.psi1[3]*site_covs[,"golf"])
+  psi1 <- plogis(b0.psi1 + b.psi1[1]*data$sitecovs[,"park"] +
+                           b.psi1[2]*data$sitecovs[,"cem"]  +
+                           b.psi1[3]*data$sitecovs[,"golf"])
   
   # psi matrix holds all occupancy probabilities in t = 1 and then the 
   # associated colonization / extinction probabilities at t > 1.
@@ -76,18 +96,20 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
   ll.y <- matrix(0, nsampled, nseason)
   
   # create resistance surface
-  cost <- exp(alpha[1]*r_covs[[1]] + 
-              alpha[2]*r_covs[[2]] + 
-              alpha[3]*r_covs[[3]])
+  cost <- exp(alpha[1]*data$res_covs[[1]] + 
+              alpha[2]*data$res_covs[[2]] + 
+              alpha[3]*data$res_covs[[3]])
   
   # create the transition function and cell lists to be used in calculating the
   # shortest paths
-  adj_graph <- getEdgeWeights(cost, directions=8, fromCoords = coords, toCoords = coords,
-                              dist.cutoff=disp_dist)
-  
-  # make adjacency graph and cell list their own stand alone variable
+  adj_graph <- getAllEdgeWeights(cost, directions=8, coords = data$coords)
+
+  # have to make variables their own stand alone variable to export to cluster
   adjacencyGraph <- adj_graph$adjacencyGraph
   cell_list <- adj_graph$cell_list
+  toCells <- adj_graph$toCells
+  fromCells <- adj_graph$fromCells
+  rm(adj_graph) # remove function object to save memory
   
   # create wrapper for shortest.paths function to go into lApply
   shortestPaths <- function(x){ shortest.paths(adjacencyGraph,
@@ -95,7 +117,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
                                                to = x[[2]],
                                                mode = "out",
                                                algorithm = "dijkstra") }
-  
+  cl <- makeCluster(detectCores()-2)
   # export function and variables to clusters
   clusterExport(cl=cl, list("adjacencyGraph", "shortestPaths", 
                             "shortest.paths"))
@@ -103,14 +125,17 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
   # use shortestPaths function in parallel
   costDist <- parLapply(cl=cl,cell_list, shortestPaths)
   
-  # turn distances into full distance matrix
-  D <- matrix(NA, nrow(adj_graph$fromCoords), nrow(adj_graph$fromCoords))
-  for(i in 1:nrow(adj_graph$fromCoords)){
-    # create a vector so that removed cells are giving same value as its matching cell
-    D[adj_graph$toCoords.loc[[i]],i] <- left_join(x=data.frame(to=adj_graph$toCells[[i]]),
-                                            y=data.frame(to=adj_graph$toCells_gdist[[i]],
-                                                         val=costDist[[i]][1,]), by="to")$val
-  }
+  # to relate this back to the full distance matrix 
+  # we have to find the cells that were removed as duplicates and join the two tables
+  # create our own funciton that uses the left join in data.table package
+  l_join <- function(x){data.table(to=toCells, val=x[1,])[data.table(to=fromCells), on="to"]$val}
+  # export variables and functions needed
+  clusterExport(cl, c("costDist", "toCells", "fromCells", "l_join", "data.table"))
+  # left join across each element of the costDist list
+  # this returns a list of vectors that is length nrow(coords)
+  D <- parLapply(cl, costDist, l_join)
+  # unlist and rbind so that it matches our full distance matrix
+  D <- do.call("rbind", D)
   
   # divide by 1000 to scale to kilometers from meters
   D <- D/1000
@@ -129,13 +154,12 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
   
   # likelihood of first season
   ll.z[,1] <- dbinom(z[,1], 1, psi[,1], log = TRUE)
-  ll.y[,1] <- dbinom(y[,1], jmat[,1], z[1:nsampled,1]*p[1], log=TRUE)
+  ll.y[,1] <- dbinom(data$y_mat[,1], data$j_mat[,1], z[1:nsampled,1]*p[1], log=TRUE)
   
   # generate z and y for season t > 1 and get log likelihood
   for(k in 2:nseason) {
     zkt <- matrix(z[,k-1], nsite, nsite, byrow=TRUE)
     PrNotColonizedByNeighbor <- 1 - G*zkt
-    #clusterExport(cl=cl, list("PrNotColonizedByNeighbor"))
     PrNotColonizedAtAll <- parApply(cl,PrNotColonizedByNeighbor, 1, prod, na.rm=TRUE)
     gamma[,k-1] <- 1 - PrNotColonizedAtAll
     psi[,k] <- z[,k-1]*(1-epsilon*(1-gamma[,k-1])) + (1-z[,k-1])*gamma[,k-1] #Rescue effect
@@ -143,7 +167,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     z[which(anyDetections[,k] == 1),k] <- 1
     ll.z[,k] <- dbinom(z[,k], 1, psi[,k], log=TRUE)
     # observation model
-    ll.y[,k] <- dbinom(y[,k], jmat[,k], z[1:nsampled,k]*p[k], log=TRUE)
+    ll.y[,k] <- dbinom(data$y_mat[,k], data$j_mat[,k], z[1:nsampled,k]*p[k], log=TRUE)
   }
 
   # Initial candidate values based off of initials
@@ -157,12 +181,12 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
   # Used to compute expected occupancy at each site
   nz1 <- z
   
-  # STARTING UPDATING PROCESS
-  # Objects to hold posterior samples
+  ##### STARTING UPDATING PROCESS ####
   
   # The number of parameters to estimate and zk for 13 seasons
   npar <- length(param_mon) + nseason-1
-
+  
+  # Objects to hold posterior samples
   # Holds posterior samples
   samples <- matrix(NA, iters, npar)
   colnames(samples) <- c(paste0("alpha",1:length(alpha)),
@@ -198,13 +222,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(plot.z) {
           library(lattice)
           zd <- data.frame(z=as.integer(z), season=rep(1:nseason, each=nsite),
-                           x=as.numeric(coords[,1])/1000, y=as.numeric(coords[,2])/1000)
+                           x=as.numeric(data$coords[,1])/1000, y=as.numeric(data$coords[,2])/1000)
           print(xyplot(y ~ x | season, zd, groups=z, aspect="iso", pch=c(1,16), 
                        as.table=TRUE))
       }
   }
 
-  # START SAMPLING FROM POSTERIOR
+  #### START SAMPLING FROM POSTERIOR #####
+  
   for(s in 1:iters) {
     
     # update ll.z.sum from the previous iteration
@@ -243,9 +268,9 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 1){
         alpha1.cand <- rnorm(1, alpha[1], tune[1])
         # create resistance surface
-        cost <- exp(alpha1.cand*r_covs[[1]] + # 1-NDVI
-                    alpha[2]*r_covs[[2]] +    # population density
-                    alpha[3]*r_covs[[3]])     # patch indicator
+        cost <- exp(alpha1.cand*data$res_covs[[1]] + # 1-NDVI
+                    alpha[2]*data$res_covs[[2]] +    # population density
+                    alpha[3]*data$res_covs[[3]])     # patch indicator
         
         # calculate the ecological distance matrix in parallel
         # divide by 1000 to scale to km
@@ -253,12 +278,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
 
         # create the transition function and cell lists to be used in calculating the
         # shortest paths
-        adj_graph <- getEdgeWeights(cost, directions=8, fromCoords = coords, toCoords = coords,
-                                    dist.cutoff=disp_dist)
+        adj_graph <- getAllEdgeWeights(cost, directions=8, coords = data$coords)
         
-        # make adjacency graph and cell list their own stand alone variable
+        # have to make variables their own stand alone variable to export to cluster
         adjacencyGraph <- adj_graph$adjacencyGraph
         cell_list <- adj_graph$cell_list
+        toCells <- adj_graph$toCells
+        fromCells <- adj_graph$fromCells
+        rm(adj_graph) # remove function object to save memory
         
         # create wrapper for shortest.paths function to go into lApply
         shortestPaths <- function(x){ shortest.paths(adjacencyGraph,
@@ -274,14 +301,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
         # use shortestPaths function in parallel
         costDist <- parLapply(cl=cl,cell_list, shortestPaths)
         
-        # turn distances into full distance matrix
-        D.cand <- matrix(NA, nrow(adj_graph$fromCoords), nrow(adj_graph$fromCoords))
-        for(i in 1:nrow(adj_graph$fromCoords)){
-          # create a vector so that removed cells are giving same value as its matching cell
-          D.cand[adj_graph$toCoords.loc[[i]],i] <- left_join(x=data.frame(to=adj_graph$toCells[[i]]),
-                                                            y=data.frame(to=adj_graph$toCells_gdist[[i]],
-                                                                         val=costDist[[i]][1,]), by="to")$val
-        }
+        # to relate this back to the full distance matrix 
+        # export new variables and functions needed
+        clusterExport(cl, c("costDist", "toCells", "fromCells", "l_join", "data.table"))
+        # left join across each element of the costDist list
+        # this returns a list of vectors that is length nrow(coords)
+        D.cand <- parLapply(cl, costDist, l_join)
+        # unlist and rbind so that it matches our full distance matrix
+        D.cand <- do.call("rbind", D.cand)
         
         # divide by 1000 to scale to kilometers from meters
         D.cand <- D.cand/1000
@@ -322,18 +349,22 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 2){
         alpha2.cand <- rnorm(1, alpha[2], tune[2])
         # create resistance surface
-        cost <- exp(alpha[1]*r_covs[[1]] + alpha2.cand*r_covs[[2]] + alpha[3]*r_covs[[3]]) 
+        cost <- exp(alpha[1]*data$res_covs[[1]] + 
+                      alpha2.cand*data$res_covs[[2]] + 
+                      alpha[3]*data$res_covs[[3]]) 
         # calculate the ecological distance matrix in parallel
         # divide by 1000 to scale to km
         # note that transition function is 1/mean(x)
         # create the transition function and cell lists to be used in calculating the
         # shortest paths
-        adj_graph <- getEdgeWeights(cost, directions=8, fromCoords = coords, toCoords = coords,
-                                    dist.cutoff=disp_dist)
+        adj_graph <- getAllEdgeWeights(cost, directions=8, coords = data$coords)
         
-        # make adjacency graph and cell list their own stand alone variable
+        # have to make variables their own stand alone variable to export to cluster
         adjacencyGraph <- adj_graph$adjacencyGraph
         cell_list <- adj_graph$cell_list
+        toCells <- adj_graph$toCells
+        fromCells <- adj_graph$fromCells
+        rm(adj_graph) # remove function object to save memory
         
         # create wrapper for shortest.paths function to go into lApply
         shortestPaths <- function(x){ shortest.paths(adjacencyGraph,
@@ -349,15 +380,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
         # use shortestPaths function in parallel
         costDist <- parLapply(cl=cl,cell_list, shortestPaths)
         
-        # turn distances into full distance matrix
-        D.cand <- matrix(NA, nrow(adj_graph$fromCoords), nrow(adj_graph$fromCoords))
-        for(i in 1:nrow(adj_graph$fromCoords)){
-          # create a vector so that removed cells are giving same value as its matching cell
-          D.cand[adj_graph$toCoords.loc[[i]],i] <- left_join(x=data.frame(to=adj_graph$toCells[[i]]),
-                                                             y=data.frame(to=adj_graph$toCells_gdist[[i]],
-                                                                          val=costDist[[i]][1,]), by="to")$val
-        }
-        
+        # to relate this back to the full distance matrix 
+        # export new variables and functions needed
+        clusterExport(cl, c("costDist", "toCells", "fromCells", "l_join", "data.table"))
+        # left join across each element of the costDist list
+        # this returns a list of vectors that is length nrow(coords)
+        D.cand <- parLapply(cl, costDist, l_join)
+        # unlist and rbind so that it matches our full distance matrix
+        D.cand <- do.call("rbind", D.cand)
         # divide by 1000 to scale to kilometers from meters
         D.cand <- D.cand/1000
         G.cand <- gamma0*exp(-D.cand^2/(2*sigma^2)) # NA's are distances that were too far to colonize
@@ -395,18 +425,22 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 3){
         alpha3.cand <- rnorm(1, alpha[3], tune[3])
         # create resistance surface
-        cost <- exp(alpha[1]*r_covs[[1]] + alpha[2]*r_covs[[2]] + alpha3.cand*r_covs[[3]])
+        cost <- exp(alpha[1]*data$res_covs[[1]] + 
+                      alpha[2]*data$res_covs[[2]] + 
+                      alpha3.cand*data$res_covs[[3]])
         # calculate the ecological distance matrix in parallel
         # divide by 1000 to scale to km
         # note that transition function is 1/mean(x)
         # create the transition function and cell lists to be used in calculating the
         # shortest paths
-        adj_graph <- getEdgeWeights(cost, directions=8, fromCoords = coords, toCoords = coords,
-                                    dist.cutoff=disp_dist)
+        adj_graph <- getAllEdgeWeights(cost, directions=8, coords = data$coords)
         
-        # make adjacency graph and cell list their own stand alone variable
+        # have to make variables their own stand alone variable to export to cluster
         adjacencyGraph <- adj_graph$adjacencyGraph
         cell_list <- adj_graph$cell_list
+        toCells <- adj_graph$toCells
+        fromCells <- adj_graph$fromCells
+        rm(adj_graph) # remove function object to save memory
         
         # create wrapper for shortest.paths function to go into lApply
         shortestPaths <- function(x){ shortest.paths(adjacencyGraph,
@@ -422,15 +456,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
         # use shortestPaths function in parallel
         costDist <- parLapply(cl=cl,cell_list, shortestPaths)
         
-        # turn distances into full distance matrix
-        D.cand <- matrix(NA, nrow(adj_graph$fromCoords), nrow(adj_graph$fromCoords))
-        for(i in 1:nrow(adj_graph$fromCoords)){
-          # create a vector so that removed cells are giving same value as its matching cell
-          D.cand[adj_graph$toCoords.loc[[i]],i] <- left_join(x=data.frame(to=adj_graph$toCells[[i]]),
-                                                             y=data.frame(to=adj_graph$toCells_gdist[[i]],
-                                                                          val=costDist[[i]][1,]), by="to")$val
-        }
-        
+        # to relate this back to the full distance matrix 
+        # export new variables and functions needed
+        clusterExport(cl, c("costDist", "toCells", "fromCells", "l_join", "data.table"))
+        # left join across each element of the costDist list
+        # this returns a list of vectors that is length nrow(coords)
+        D.cand <- parLapply(cl, costDist, l_join)
+        # unlist and rbind so that it matches our full distance matrix
+        D.cand <- do.call("rbind", D.cand)
         # divide by 1000 to scale to kilometers from meters
         D.cand <- D.cand/1000
         
@@ -468,10 +501,10 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       ## Metropolis update for b0.gam - part of gamma0 linear model
       if(sampling_order[subiter] == 4){
         b0.gam.cand <- rnorm(1, b0.gam, tune[4])
-        gamma0.cand <- plogis(b0.gam.cand + b.gam[1]*site_covs[,"size"] +
-                              b.gam[2]*site_covs[,"park"] +
-                              b.gam[3]*site_covs[,"cem"] +
-                              b.gam[4]*site_covs[,"golf"])
+        gamma0.cand <- plogis(b0.gam.cand + b.gam[1]*data$sitecovs[,"size"] +
+                              b.gam[2]*data$sitecovs[,"park"] +
+                              b.gam[3]*data$sitecovs[,"cem"] +
+                              b.gam[4]*data$sitecovs[,"golf"])
         G.cand <- gamma0.cand*exp(-D^2/(2*sigma^2))
         G.cand[is.na(G.cand)] <- 0 # change NA's to 0
         # model
@@ -505,10 +538,10 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       ## Metropolis update for b.gam[1] - part of gamma0 linear model
       if(sampling_order[subiter] == 5){
         b1.gam.cand <- rnorm(1, b.gam[1], tune[5])
-        gamma0.cand <- plogis(b0.gam + b1.gam.cand*site_covs[,"size"] +
-                                b.gam[2]*site_covs[,"park"] + 
-                                b.gam[3]*site_covs[,"cem"] + 
-                                b.gam[4]*site_covs[,"golf"])
+        gamma0.cand <- plogis(b0.gam + b1.gam.cand*data$sitecovs[,"size"] +
+                                b.gam[2]*data$sitecovs[,"park"] + 
+                                b.gam[3]*data$sitecovs[,"cem"] + 
+                                b.gam[4]*data$sitecovs[,"golf"])
         G.cand <- gamma0.cand*exp(-D^2/(2*sigma^2))
         G.cand[is.na(G.cand)] <- 0 # change NA's to 0
         # model
@@ -542,10 +575,10 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       ## Metropolis update for b.gam[2] - part of gamma0 linear model
       if(sampling_order[subiter] == 6){
         b2.gam.cand <- rnorm(1, b.gam[2], tune[6])
-        gamma0.cand <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + 
-                                      b2.gam.cand*site_covs[,"park"] +
-                                      b.gam[3]*site_covs[,"cem"] +
-                                      b.gam[4]*site_covs[,"golf"])
+        gamma0.cand <- plogis(b0.gam + b.gam[1]*data$sitecovs[,"size"] + 
+                                      b2.gam.cand*data$sitecovs[,"park"] +
+                                      b.gam[3]*data$sitecovs[,"cem"] +
+                                      b.gam[4]*data$sitecovs[,"golf"])
         G.cand <- gamma0.cand*exp(-D^2/(2*sigma^2))
         G.cand[is.na(G.cand)] <- 0 # change NA's to 0
         # model
@@ -579,10 +612,10 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       ## Metropolis update for b.gam[3] - part of gamma0 linear model
       if(sampling_order[subiter] == 7){
         b3.gam.cand <- rnorm(1, b.gam[3], tune[7])
-        gamma0.cand <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + 
-                                      b.gam[2]*site_covs[,"park"] + 
-                                      b3.gam.cand*site_covs[,"cem"] +
-                                      b.gam[4]*site_covs[,"golf"])
+        gamma0.cand <- plogis(b0.gam + b.gam[1]*data$sitecovs[,"size"] + 
+                                      b.gam[2]*data$sitecovs[,"park"] + 
+                                      b3.gam.cand*data$sitecovs[,"cem"] +
+                                      b.gam[4]*data$sitecovs[,"golf"])
         G.cand <- gamma0.cand*exp(-D^2/(2*sigma^2))
         G.cand[is.na(G.cand)] <- 0 # change NA's to 0
         # model
@@ -616,10 +649,10 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       ## Metropolis update for b.gam[4] - part of gamma0 linear model
       if(sampling_order[subiter] == 8){
         b4.gam.cand <- rnorm(1, b.gam[4], tune[8])
-        gamma0.cand <- plogis(b0.gam + b.gam[1]*site_covs[,"size"] + 
-                                      b.gam[2]*site_covs[,"park"] +
-                                      b.gam[3]*site_covs[,"cem"] + 
-                                      b4.gam.cand*site_covs[,"golf"])
+        gamma0.cand <- plogis(b0.gam + b.gam[1]*data$sitecovs[,"size"] + 
+                                      b.gam[2]*data$sitecovs[,"park"] +
+                                      b.gam[3]*data$sitecovs[,"cem"] + 
+                                      b4.gam.cand*data$sitecovs[,"golf"])
         G.cand <- gamma0.cand*exp(-D^2/(2*sigma^2))
         G.cand[is.na(G.cand)] <- 0 # change NA's to 0
         # model
@@ -688,9 +721,9 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 10){
         b0.psi1.cand <- rnorm(1, b0.psi1, tune[10])
         # model
-        psi1.cand <- plogis(b0.psi1.cand + b.psi1[1]*site_covs[,"park"] +
-                              b.psi1[2]*site_covs[,"cem"] + 
-                              b.psi1[3]*site_covs[,"golf"])
+        psi1.cand <- plogis(b0.psi1.cand + b.psi1[1]*data$sitecovs[,"park"] +
+                              b.psi1[2]*data$sitecovs[,"cem"] + 
+                              b.psi1[3]*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1.cand
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -718,9 +751,9 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 11){
         b1.psi1.cand <- rnorm(1, b.psi1[1], tune[11])
         # model
-        psi1.cand <- plogis(b0.psi1 + b1.psi1.cand*site_covs[,"park"] +
-                              b.psi1[2]*site_covs[,"cem"] + 
-                              b.psi1[3]*site_covs[,"golf"])
+        psi1.cand <- plogis(b0.psi1 + b1.psi1.cand*data$sitecovs[,"park"] +
+                              b.psi1[2]*data$sitecovs[,"cem"] + 
+                              b.psi1[3]*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1.cand
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -749,9 +782,9 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 12){
         b2.psi1.cand <- rnorm(1, b.psi1[2], tune[12])
         # model
-        psi1.cand <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] + 
-                              b2.psi1.cand*site_covs[,"cem"] +
-                              b.psi1[3]*site_covs[,"golf"])
+        psi1.cand <- plogis(b0.psi1 + b.psi1[1]*data$sitecovs[,"park"] + 
+                              b2.psi1.cand*data$sitecovs[,"cem"] +
+                              b.psi1[3]*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1.cand
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -780,9 +813,9 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 13){
         b3.psi1.cand <- rnorm(1, b.psi1[3], tune[13])
         # model
-        psi1.cand <- plogis(b0.psi1 + b.psi1[1]*site_covs[,"park"] + 
-                              b.psi1[2]*site_covs[,"cem"] +
-                              b3.psi1.cand*site_covs[,"golf"])
+        psi1.cand <- plogis(b0.psi1 + b.psi1[1]*data$sitecovs[,"park"] + 
+                              b.psi1[2]*data$sitecovs[,"cem"] +
+                              b3.psi1.cand*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1.cand
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -810,14 +843,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     ## Metropolis update for b0.eps - part of the linear predictor for epsilon
       if(sampling_order[subiter] == 14){
         b0.eps.cand <- rnorm(1, b0.eps, tune[14])
-        epsilon.cand <- plogis(b0.eps.cand + b.eps[1]*site_covs[,"tree"] + 
-                                            b.eps[2]*site_covs[,"total_veg"] +
-                                            b.eps[3]*site_covs[,"size"] +
-                                            b.eps[4]*site_covs[,"pop10"] +
-                                            b.eps[5]*site_covs[,"water"] +
-                                            b.eps[6]*site_covs[,"park"] +
-                                            b.eps[7]*site_covs[,"cem"] +
-                                            b.eps[8]*site_covs[,"golf"])
+        epsilon.cand <- plogis(b0.eps.cand + b.eps[1]*data$sitecovs[,"tree"] + 
+                                            b.eps[2]*data$sitecovs[,"total_veg"] +
+                                            b.eps[3]*data$sitecovs[,"size"] +
+                                            b.eps[4]*data$sitecovs[,"pop10"] +
+                                            b.eps[5]*data$sitecovs[,"water"] +
+                                            b.eps[6]*data$sitecovs[,"park"] +
+                                            b.eps[7]*data$sitecovs[,"cem"] +
+                                            b.eps[8]*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -845,14 +878,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     ## Metropolis update for b.eps[1] - part of the linear predictor for epsilon
       if(sampling_order[subiter] == 15){
         b1.eps.cand <- rnorm(1, b.eps[1], tune[15])
-        epsilon.cand <- plogis(b0.eps + b1.eps.cand*site_covs[,"tree"] +
-                                        b.eps[2]*site_covs[,"total_veg"] +
-                                        b.eps[3]*site_covs[,"size"] +
-                                        b.eps[4]*site_covs[,"pop10"] +
-                                        b.eps[5]*site_covs[,"water"] +
-                                        b.eps[6]*site_covs[,"park"] +
-                                        b.eps[7]*site_covs[,"cem"] +
-                                        b.eps[8]*site_covs[,"golf"])
+        epsilon.cand <- plogis(b0.eps + b1.eps.cand*data$sitecovs[,"tree"] +
+                                        b.eps[2]*data$sitecovs[,"total_veg"] +
+                                        b.eps[3]*data$sitecovs[,"size"] +
+                                        b.eps[4]*data$sitecovs[,"pop10"] +
+                                        b.eps[5]*data$sitecovs[,"water"] +
+                                        b.eps[6]*data$sitecovs[,"park"] +
+                                        b.eps[7]*data$sitecovs[,"cem"] +
+                                        b.eps[8]*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -880,14 +913,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     ## Metropolis update for b.eps[2] - part of the linear predictor for epsilon
       if(sampling_order[subiter] == 16){
         b2.eps.cand <- rnorm(1, b.eps[2], tune[16])
-        epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
-                                        b2.eps.cand*site_covs[,"total_veg"] +
-                                        b.eps[3]*site_covs[,"size"] +
-                                        b.eps[4]*site_covs[,"pop10"] +
-                                        b.eps[5]*site_covs[,"water"] +
-                                        b.eps[6]*site_covs[,"park"] +
-                                        b.eps[7]*site_covs[,"cem"] +
-                                        b.eps[8]*site_covs[,"golf"])
+        epsilon.cand <- plogis(b0.eps + b.eps[1]*data$sitecovs[,"tree"] +
+                                        b2.eps.cand*data$sitecovs[,"total_veg"] +
+                                        b.eps[3]*data$sitecovs[,"size"] +
+                                        b.eps[4]*data$sitecovs[,"pop10"] +
+                                        b.eps[5]*data$sitecovs[,"water"] +
+                                        b.eps[6]*data$sitecovs[,"park"] +
+                                        b.eps[7]*data$sitecovs[,"cem"] +
+                                        b.eps[8]*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -915,14 +948,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     ## Metropolis update for b.eps[3] - part of the linear predictor for epsilon
       if(sampling_order[subiter] == 17){
         b3.eps.cand <- rnorm(1, b.eps[3], tune[17])
-        epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
-                                        b.eps[2]*site_covs[,"total_veg"] +
-                                        b3.eps.cand*site_covs[,"size"] +
-                                        b.eps[4]*site_covs[,"pop10"] +
-                                        b.eps[5]*site_covs[,"water"] +
-                                        b.eps[6]*site_covs[,"park"] +
-                                        b.eps[7]*site_covs[,"cem"] +
-                                        b.eps[8]*site_covs[,"golf"])
+        epsilon.cand <- plogis(b0.eps + b.eps[1]*data$sitecovs[,"tree"] +
+                                        b.eps[2]*data$sitecovs[,"total_veg"] +
+                                        b3.eps.cand*data$sitecovs[,"size"] +
+                                        b.eps[4]*data$sitecovs[,"pop10"] +
+                                        b.eps[5]*data$sitecovs[,"water"] +
+                                        b.eps[6]*data$sitecovs[,"park"] +
+                                        b.eps[7]*data$sitecovs[,"cem"] +
+                                        b.eps[8]*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -950,14 +983,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     ## Metropolis update for b.eps[4] - part of the linear predictor for epsilon
       if(sampling_order[subiter] == 18){
         b4.eps.cand <- rnorm(1, b.eps[4], tune[18])
-        epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
-                                        b.eps[2]*site_covs[,"total_veg"] +
-                                        b.eps[3]*site_covs[,"size"] +
-                                        b4.eps.cand*site_covs[,"pop10"] +
-                                        b.eps[5]*site_covs[,"water"] +
-                                        b.eps[6]*site_covs[,"park"] +
-                                        b.eps[7]*site_covs[,"cem"] +
-                                        b.eps[8]*site_covs[,"golf"])
+        epsilon.cand <- plogis(b0.eps + b.eps[1]*data$sitecovs[,"tree"] +
+                                        b.eps[2]*data$sitecovs[,"total_veg"] +
+                                        b.eps[3]*data$sitecovs[,"size"] +
+                                        b4.eps.cand*data$sitecovs[,"pop10"] +
+                                        b.eps[5]*data$sitecovs[,"water"] +
+                                        b.eps[6]*data$sitecovs[,"park"] +
+                                        b.eps[7]*data$sitecovs[,"cem"] +
+                                        b.eps[8]*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -985,14 +1018,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     ## Metropolis update for b.eps[5] - part of the linear predictor for epsilon
       if(sampling_order[subiter] == 19){
         b5.eps.cand <- rnorm(1, b.eps[5], tune[19])
-        epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
-                                        b.eps[2]*site_covs[,"total_veg"] +
-                                        b.eps[3]*site_covs[,"size"] +
-                                        b.eps[4]*site_covs[,"pop10"] +
-                                        b5.eps.cand*site_covs[,"water"] +
-                                        b.eps[6]*site_covs[,"park"] +
-                                        b.eps[7]*site_covs[,"cem"] +
-                                        b.eps[8]*site_covs[,"golf"])
+        epsilon.cand <- plogis(b0.eps + b.eps[1]*data$sitecovs[,"tree"] +
+                                        b.eps[2]*data$sitecovs[,"total_veg"] +
+                                        b.eps[3]*data$sitecovs[,"size"] +
+                                        b.eps[4]*data$sitecovs[,"pop10"] +
+                                        b5.eps.cand*data$sitecovs[,"water"] +
+                                        b.eps[6]*data$sitecovs[,"park"] +
+                                        b.eps[7]*data$sitecovs[,"cem"] +
+                                        b.eps[8]*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -1020,14 +1053,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     ## Metropolis update for b.eps[6] - part of the linear predictor for epsilon
       if(sampling_order[subiter] == 20){
         b6.eps.cand <- rnorm(1, b.eps[6], tune[20])
-        epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
-                                        b.eps[2]*site_covs[,"total_veg"] +
-                                        b.eps[3]*site_covs[,"size"] +
-                                        b.eps[4]*site_covs[,"pop10"] +
-                                        b.eps[5]*site_covs[,"water"] +
-                                        b6.eps.cand*site_covs[,"park"] +
-                                        b.eps[7]*site_covs[,"cem"] +
-                                        b.eps[8]*site_covs[,"golf"])
+        epsilon.cand <- plogis(b0.eps + b.eps[1]*data$sitecovs[,"tree"] +
+                                        b.eps[2]*data$sitecovs[,"total_veg"] +
+                                        b.eps[3]*data$sitecovs[,"size"] +
+                                        b.eps[4]*data$sitecovs[,"pop10"] +
+                                        b.eps[5]*data$sitecovs[,"water"] +
+                                        b6.eps.cand*data$sitecovs[,"park"] +
+                                        b.eps[7]*data$sitecovs[,"cem"] +
+                                        b.eps[8]*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -1055,14 +1088,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     ## Metropolis update for b.eps[7] - part of the linear predictor for epsilon
       if(sampling_order[subiter] == 21){
         b7.eps.cand <- rnorm(1, b.eps[7], tune[21])
-        epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
-                                        b.eps[2]*site_covs[,"total_veg"] +
-                                        b.eps[3]*site_covs[,"size"] +
-                                        b.eps[4]*site_covs[,"pop10"] +
-                                        b.eps[5]*site_covs[,"water"] +
-                                        b.eps[6]*site_covs[,"park"] +
-                                        b7.eps.cand*site_covs[,"cem"] +
-                                        b.eps[8]*site_covs[,"golf"])
+        epsilon.cand <- plogis(b0.eps + b.eps[1]*data$sitecovs[,"tree"] +
+                                        b.eps[2]*data$sitecovs[,"total_veg"] +
+                                        b.eps[3]*data$sitecovs[,"size"] +
+                                        b.eps[4]*data$sitecovs[,"pop10"] +
+                                        b.eps[5]*data$sitecovs[,"water"] +
+                                        b.eps[6]*data$sitecovs[,"park"] +
+                                        b7.eps.cand*data$sitecovs[,"cem"] +
+                                        b.eps[8]*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -1090,14 +1123,14 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     ## Metropolis update for b.eps[8] - part of the linear predictor for epsilon
       if(sampling_order[subiter] == 22){
         b8.eps.cand <- rnorm(1, b.eps[8], tune[22])
-        epsilon.cand <- plogis(b0.eps + b.eps[1]*site_covs[,"tree"] +
-                                        b.eps[2]*site_covs[,"total_veg"] +
-                                        b.eps[3]*site_covs[,"size"] +
-                                        b.eps[4]*site_covs[,"pop10"] +
-                                        b.eps[5]*site_covs[,"water"] +
-                                        b.eps[6]*site_covs[,"park"] +
-                                        b.eps[7]*site_covs[,"cem"] +
-                                        b8.eps.cand*site_covs[,"golf"])
+        epsilon.cand <- plogis(b0.eps + b.eps[1]*data$sitecovs[,"tree"] +
+                                        b.eps[2]*data$sitecovs[,"total_veg"] +
+                                        b.eps[3]*data$sitecovs[,"size"] +
+                                        b.eps[4]*data$sitecovs[,"pop10"] +
+                                        b.eps[5]*data$sitecovs[,"water"] +
+                                        b.eps[6]*data$sitecovs[,"park"] +
+                                        b.eps[7]*data$sitecovs[,"cem"] +
+                                        b8.eps.cand*data$sitecovs[,"golf"])
         psi.cand[,1] <- psi1
         ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
         for(k in 2:nseason) {
@@ -1127,29 +1160,6 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
         zkup <- rep(0, nseason)
         zknown1 <- anyDetections[,1]==1
         zknown1[is.na(zknown1)] <- FALSE
-      # # update for seasons 1
-      # for(i in 1:nsite){
-      #   if(zknown1[i]) next # only estimate sites where we did not detect the species
-      #   z1.cand <- z[,1]
-    #   z1.cand[i] <- 1-z[i,1]
-    #   ll.y1.tmp <- ll.y1.cand.tmp <- 0
-    #   if(i <= nsampled) { # only use sampled sites
-    #     ll.y1.cand.tmp <- dbinom(y[i,1], j[i,1], z1.cand[i]*p[1], log=TRUE)
-    #     ll.y1.tmp <- sum(ll.y[i,1], na.rm=TRUE) # trick to turn all NA's to 0
-    #   }
-    #   ll.z1.cand <- dbinom(z1.cand[i], 1, psi[i,1], log=TRUE)
-    #   ll.z1.tmp <- sum(ll.z[i,1], na.rm=TRUE)
-    #   # proposal
-    #   if(runif(1) < exp((sum(ll.y1.cand.tmp, na.rm=TRUE) + ll.z1.cand) -
-    #                     (ll.y1.tmp + ll.z1.tmp))) {
-    #     z[,1] <- z1.cand
-    #     ll.z[i,1] <- ll.z1.cand
-    #     if(i <= nsampled) {
-    #       ll.y[i,1] <- ll.y1.cand.tmp
-    #     }
-    #     zkup[1] <- zkup[1] + 1
-    #   }
-    # }
     # update for seasons k+1
         for(k in 1:nseason) {
           zknown <- anyDetections[,k]==1
@@ -1162,7 +1172,7 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
             # ll.y candidate
             ll.y.tmp <- ll.y.cand.tmp <- 0
             if(i <= nsampled) { # only use sampled sites
-              ll.y.cand.tmp <- dbinom(y[i,k], jmat[i,k], zk.cand[i]*p[k], log=TRUE)
+              ll.y.cand.tmp <- dbinom(data$y_mat[i,k], data$j_mat[i,k], zk.cand[i]*p[k], log=TRUE)
               ll.y.tmp <- sum(ll.y[i,k], na.rm=TRUE) # trick to turn NA's to 0
             }
             # prior for z
@@ -1203,12 +1213,12 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
     ## Metropolis update for a0 - part of detection probability
       if(sampling_order[subiter] == 23){
         a0.cand<-rnorm(1, a0, tune[23])
-        p.cand <- plogis(a0.cand + season[obs_covs])
+        p.cand <- plogis(a0.cand + season[data$season_vec])
         p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
         p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
     
-        ll.y <- dbinom(y, jmat, z[1:nsampled,]*p.mat, log=TRUE)
-        ll.y.cand <- dbinom(y, jmat, z[1:nsampled,]*p.cand.mat, log=TRUE)
+        ll.y <- dbinom(data$y_mat, data$j_mat, z[1:nsampled,]*p.mat, log=TRUE)
+        ll.y.cand <- dbinom(data$y_mat, data$j_mat, z[1:nsampled,]*p.cand.mat, log=TRUE)
         # priors
         prior.a0.cand <- dnorm(a0.cand, 0, 2, log=TRUE) 
         prior.a0 <- dnorm(a0, 0, 2, log=TRUE)
@@ -1230,12 +1240,12 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 24){
         season2.cand.vec <- season
         season2.cand.vec[2] <- rnorm(1, season[2], tune[24])
-        p.cand <- plogis(a0 + season2.cand.vec[obs_covs])
+        p.cand <- plogis(a0 + season2.cand.vec[data$season_vec])
         p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
         p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
         
-        ll.y <- dbinom(y, jmat, z[1:nsampled,]*p.mat, log=TRUE)
-        ll.y.cand <- dbinom(y, jmat, z[1:nsampled,]*p.cand.mat, log=TRUE)
+        ll.y <- dbinom(data$y_mat, data$j_mat, z[1:nsampled,]*p.mat, log=TRUE)
+        ll.y.cand <- dbinom(data$y_mat, data$j_mat, z[1:nsampled,]*p.cand.mat, log=TRUE)
         # priors
         prior.season2.cand <- dnorm(season2.cand.vec[2], 0, 2, log=TRUE) 
         prior.season2 <- dnorm(season[2], 0, 2, log=TRUE)
@@ -1257,12 +1267,12 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 25){
         season3.cand.vec <- season
         season3.cand.vec[3] <- rnorm(1, season[3], tune[25])
-        p.cand <- plogis(a0 + season3.cand.vec[obs_covs])
+        p.cand <- plogis(a0 + season3.cand.vec[data$season_vec])
         p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
         p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
         
-        ll.y <- dbinom(y, jmat, z[1:nsampled,]*p.mat, log=TRUE)
-        ll.y.cand <- dbinom(y, jmat, z[1:nsampled,]*p.cand.mat, log=TRUE)
+        ll.y <- dbinom(data$y_mat, data$j_mat, z[1:nsampled,]*p.mat, log=TRUE)
+        ll.y.cand <- dbinom(data$y_mat, data$j_mat, z[1:nsampled,]*p.cand.mat, log=TRUE)
         # priors
         prior.season3.cand <- dnorm(season3.cand.vec[3], 0, 2, log=TRUE) 
         prior.season3 <- dnorm(season[3], 0, 2, log=TRUE)
@@ -1284,12 +1294,12 @@ occuConn <- function(y,            # nsampled x nseason matrix of detection data
       if(sampling_order[subiter] == 26){
         season4.cand.vec <- season
         season4.cand.vec[4] <- rnorm(1, season[4], tune[26])
-        p.cand <- plogis(a0 + season4.cand.vec[obs_covs])
+        p.cand <- plogis(a0 + season4.cand.vec[data$season_vec])
         p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
         p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
         
-        ll.y <- dbinom(y, jmat, z[1:nsampled,]*p.mat, log=TRUE)
-        ll.y.cand <- dbinom(y, jmat, z[1:nsampled,]*p.cand.mat, log=TRUE)
+        ll.y <- dbinom(data$y_mat, data$j_mat, z[1:nsampled,]*p.mat, log=TRUE)
+        ll.y.cand <- dbinom(data$y_mat, data$j_mat, z[1:nsampled,]*p.cand.mat, log=TRUE)
         # priors
         prior.season4.cand <- dnorm(season4.cand.vec[4], 0, 2, log=TRUE) 
         prior.season4 <- dnorm(season[4], 0, 2, log=TRUE)

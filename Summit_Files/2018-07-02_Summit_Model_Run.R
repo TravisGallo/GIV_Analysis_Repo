@@ -1,20 +1,16 @@
 
-load("2018-07-02_occConnC_Summit_Data.RData")
-
-cat("data loaded")
+load("2018-08-24_occConnC_Data.RData")
 
 library(raster)
 library(doParallel)
 library(gdistance)
 library(dplyr)
 
-cat("packages loaded")
-
 # run sampler
 occConn_mout <- occuConnC(
-  x = data$coords,
+  coords = data$coords,
   y = data$y_mat,
-  j = data$j_mat,
+  jmat = data$j_mat,
   site_covs = data$sitecovs,
   obs_covs = data$season_vec,
   r_covs = data$res_covs,
@@ -39,3 +35,5 @@ occConn_mout <- occuConnC(
                 "b.eps[7]", "b.eps[8]", "a0", "season[2]","season[3]", 
                 "season[4]", "zk", "deviance")
 )
+
+save.image("2018-08-24_mcmc_testrun.RData")

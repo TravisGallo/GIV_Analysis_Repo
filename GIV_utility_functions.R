@@ -147,48 +147,57 @@ extractLandcover <- function(layer, n.cores){
 
 
 # function that creates a transition layer, corrects diagnols, and creates a cost distance matrix
-distanceMatrix <- function(x, transitionFunction, directions, symm, fromCoords, toCoords, dist.cutoff, cluster)
+getEdgeWeights <- function(cost_raster, transitionFunction, directions, fromCoords, toCoords, dist.cutoff)
 {
-  ### modified transition function
+  ### modified transition function from gdistance package to format the cost raster
   # calculate conductances among neighbors
+  # create empty transition matrix
   tr <- new("TransitionLayer",
-            nrows=as.integer(nrow(x)),
-            ncols=as.integer(ncol(x)),
-            extent=extent(x),
-            crs=projection(x, asText=FALSE),
-            transitionMatrix = Matrix(0,ncell(x),ncell(x)),
-            transitionCells = 1:ncell(x))
+            nrows=as.integer(nrow(cost_raster)),
+            ncols=as.integer(ncol(cost_raster)),
+            extent=extent(cost_raster),
+            crs=projection(cost_raster, asText=FALSE),
+            transitionMatrix = Matrix(0,ncell(cost_raster),ncell(cost_raster)),
+            transitionCells = 1:ncell(cost_raster))
+  # weird way to make a function, but from the gdistance package
   transitionMatr <- transitionMatrix(tr)
-  Cells <- which(!is.na(getValues(x)))
-  adj <- adjacent(x, cells=Cells, pairs=TRUE, target=Cells, directions=directions)
-  if(symm){adj <- adj[adj[,1] < adj[,2],]}
-  dataVals <- cbind(getValues(x)[adj[,1]],getValues(x)[adj[,2]])
-  # run in parallel using parapply
-  transition.values <- parApply(cluster,dataVals,1,function(x) 1/mean(x))
+  # find cells that actually have values in them
+  Cells <- which(!is.na(getValues(cost_raster)))
+  # identify adjacent cells and create adjacency matrix
+  adj <- adjacent(cost_raster, cells=Cells, pairs=TRUE, target=Cells, directions=directions)
+  # make it a symmetrical matrix
+  adj <- adj[adj[,1] < adj[,2],]
+  # get cell values from cost raster
+  dataVals <- cbind(getValues(cost_raster)[adj[,1]],getValues(cost_raster)[adj[,2]])
+  # calcualte the transition (conductance) values using 1/mean(x)
+  transition.values <- 1/rowMeans(dataVals)
+  # there cant be negative values
   if(!all(transition.values>=0)){warning("transition function gives negative values")}
+  # turn the adjacency values into a transition matrix
   transitionMatr[adj] <- as.vector(transition.values)
-  if(symm)
-  {
-    transitionMatr <- forceSymmetric(transitionMatr)
-  }
+  transitionMatr <- forceSymmetric(transitionMatr)
   transitionMatrix(tr) <- transitionMatr
   matrixValues(tr) <- "conductance"
   ### geocorrect the transition matrix
   # adjust diag. conductances
   trCorr <- geoCorrection(tr, type="c", multpl = FALSE, scl = FALSE)
-  ### modified costdistance function
+  
+  ### modified costdistance function from gdistance package to format the to and from coordinates
   ## create a list of sites only within dispersal distance (Euclidian) from each site
   toCoords.loc <- vector("list", nrow(toCoords)) # location of each retained coordinate in the distance matrix
   toCoords.list <- vector("list", nrow(toCoords)) # list of coordinates within dispersal distance of each individual point (list in order of points)
   for(j in 1:nrow(toCoords)){
+    # calcualte Euclidian distance from each point to all the rest
     toCoords.loc[[j]] <- which(sqrt((fromCoords[j,1]-fromCoords[,1])^2 + 
                                       (fromCoords[j,2]-fromCoords[,2])^2) < dist.cutoff)
+    # save the location of the used coordinates from the entire list of coordinates
     toCoords.list[[j]] <- toCoords[toCoords.loc[[j]],]
   }
-  # indicates which cells the fromCoords are in
-    # remove duplicates with unique function
+  
+  # align the coordinates with the cells from the transition matrix
   fromCells <- cellFromXY(trCorr, fromCoords)
   
+  # remove duplicates with unique function
   # have to set up toCells a bit different
   toCells <- toCells_gdist <- vector("list", nrow(fromCoords)) # list to hold the toCells for each individual fromCell
   # indicate the toCells, but keep them within the list to hold true to the dispersal cutoff
@@ -211,31 +220,71 @@ distanceMatrix <- function(x, transitionFunction, directions, symm, fromCoords, 
   # reclassify edge weights as cost
   E(adjacencyGraph)$weight <- 1/E(adjacencyGraph)$weight
   
-  # create wrapper for shortest.paths function to go into lApply
-  shortestPaths <- function(x){ shortest.paths(adjacencyGraph,
-                                               v = x[[1]],
-                                               to = x[[2]],
-                                               mode = "out",
-                                               algorithm = "dijkstra") }
-  
-  # export function and variables to clusters
-  clusterExport(cl=cluster, list("adjacencyGraph", "shortestPaths", 
-                                 "shortest.paths"),
-                envir=environment())
-  # use shortestPaths function in parallel
-  costDist <- parLapply(cl=cluster,cell_list, shortestPaths)
-  # remove exported variables to make room for next run
-  clusterEvalQ(cluster, rm(list=ls()))
-  # turn distances into full distance matrix
-  D_mat <- matrix(NA, nrow(fromCoords), nrow(fromCoords))
-  for(i in 1:nrow(fromCoords)){
-    # create a vector so that removed cells are giving same value as its matching cell
-    D_mat[toCoords.loc[[i]],i] <- left_join(x=data.frame(to=toCells[[i]]),
-                                            y=data.frame(to=toCells_gdist[[i]],
-                                                         val=costDist[[i]][1,]), by="to")$val
-  }
-  rownames(D_mat) <- rownames(fromCoords)
-  colnames(D_mat) <- rownames(fromCoords)
-  
-  return(D_mat)
+  return(list(adjacencyGraph = adjacencyGraph,
+              cell_list = cell_list,
+              fromCoords = fromCoords,
+              toCoords.loc = toCoords.loc,
+              toCells = toCells,
+              toCells_gdist = toCells_gdist))
 }
+         
+# function that creates a transition layer, corrects diagnols, and creates a cost distance matrix
+getAllEdgeWeights <- function(cost_raster, directions, coords){
+  ### modified transition function from gdistance package to format the cost raster
+  # calculate conductances among neighbors
+  # create empty transition matrix
+  tr <- new("TransitionLayer",
+            nrows=as.integer(nrow(cost_raster)),
+            ncols=as.integer(ncol(cost_raster)),
+            extent=extent(cost_raster),
+            crs=projection(cost_raster, asText=FALSE),
+            transitionMatrix = Matrix(0,ncell(cost_raster),ncell(cost_raster)),
+            transitionCells = 1:ncell(cost_raster))
+  # weird way to make a function, but from the gdistance package
+  transitionMatr <- transitionMatrix(tr)
+  # find cells that actually have values in them
+  Cells <- which(!is.na(getValues(cost_raster)))
+  # identify adjacent cells and create adjacency matrix
+  adj <- adjacent(cost_raster, cells=Cells, pairs=TRUE, target=Cells, directions=directions)
+  # make it a symmetrical matrix
+  adj <- adj[adj[,1] < adj[,2],]
+  # get cell values from cost raster
+  dataVals <- cbind(getValues(cost_raster)[adj[,1]],getValues(cost_raster)[adj[,2]])
+  # calcualte the transition (conductance) values using 1/mean(x)
+  transition.values <- 1/rowMeans(dataVals)
+  # there cant be negative values
+  if(!all(transition.values>=0)){warning("transition function gives negative values")}
+  # turn the adjacency values into a transition matrix
+  transitionMatr[adj] <- as.vector(transition.values)
+  transitionMatr <- forceSymmetric(transitionMatr)
+  transitionMatrix(tr) <- transitionMatr
+  matrixValues(tr) <- "conductance"
+  ### geocorrect the transition matrix
+  # adjust diag. conductances
+  trCorr <- geoCorrection(tr, type="c", multpl = FALSE, scl = FALSE)
+  # make the transition matrix an object that igraph can read
+  y <- gdistance::transitionMatrix(trCorr)
+  # create an adjacencyGraph to get edge weights
+  if(isSymmetric(y)) {m <- "undirected"} else{m <- "directed"}
+  adjacencyGraph <- graph.adjacency(y, mode=m, weighted=TRUE)
+  # reclassify edge weights as cost
+  E(adjacencyGraph)$weight <- 1/E(adjacencyGraph)$weight
+  
+  # align the coordinates with the cells from the transition matrix
+  fromCells <- cellFromXY(trCorr, coords)
+  # there can not be duplications in the toCells
+  toCells <- unique(fromCells)
+  
+  # make a list object that can be run through parLapply
+  cell_list <- vector("list", length(fromCells))
+  for(i in 1:length(cell_list)){
+    cell_list[[i]] <- list(fromCells[i],toCells)
+  }
+  
+  return(list(adjacencyGraph = adjacencyGraph,
+              cell_list = cell_list,
+              fromCells = fromCells,
+              toCells = toCells))
+}
+
+  

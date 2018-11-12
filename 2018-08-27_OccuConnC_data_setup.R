@@ -205,8 +205,7 @@ saveRDS(data_list, "2018-08-24_occusampler_data.RDS")
 data <- readRDS("2018-08-24_occusampler_data.RDS")
 
 source("GIV_utility_functions.R")
-source("metapop_connect_dynoccu_mcmc_sampler.R")
 
-rm(packs,df_2_array,extractLandcover,getIntersect,occuConn,package_load)
+rm(packs,df_2_array,extractLandcover,getIntersect,occuConn,package_load,getEdgeWeights)
 
-save.image("2018-08-24_occConnC_Data.RData")
+save.image("2018-08-27_occConnC_Data.RData")
