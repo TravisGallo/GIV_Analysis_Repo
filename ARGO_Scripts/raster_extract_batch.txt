@@ -1,0 +1,34 @@
+#!/bin/sh
+
+## Name of the job in the squeue output
+#SBATCH --job-name raster-extract
+
+## Deal with output and errors.  Separate into 2 files (not the default).
+## NOTE: %u=userID, %x=jobName, %N=nodeID, %j=jobID, %A=arrayMain, %a=arraySub
+#SBATCH -o /scratch/%u/outputs/%x-%N-%j.out    # Output file
+#SBATCH -e /scratch/%u/errors/%x-%N-%j.err    # Error file
+#SBATCH --mail-type=BEGIN,END,FAIL     # NONE,BEGIN,END,FAIL,REQUEUE,ALL,...
+#SBATCH --mail-user=hgallo@gmu.edu   # Put your GMU email address here
+
+## Specifying an upper limit on needed resources will improve your scheduling
+## priority, but if you exceed these values, your job will be terminated.
+## Check your "Job Ended" emails for actual resource usage info.
+#SBATCH --mem=1G    # Total memory needed for your job (suffixes: K,M,G,T)
+#SBATCH --time=3-00:00  # Total time needed for your job: Days-Hours:Minutes
+
+## ----- Parallel Threads -----
+#SBATCH --cpus-per-task 24
+
+## Purge modules first
+module purge
+
+## Load the relevant modules needed for the job
+module load R/3.5.1
+
+## R wants to write files to our current directory, so make sure it's writable
+##ORIG_DIR=$PWD
+##cd /scratch/$USER
+
+## Start the job
+Rscript --no-restore --quiet --no-save 2019-03-25_raster_extract.R
+

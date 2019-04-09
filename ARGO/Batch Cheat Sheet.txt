@@ -1,0 +1,47 @@
+# login to Argo
+ssh hgallo@argo.orc.gmu.edu
+
+# upload from computer
+scp ./Rmpi_test_BATCH.txt hgallo@argo.orc.gmu.edu:
+
+
+
+
+## Slurm glossary:
+##  Partition - A Job queue, submitted jobs stay here until resources are free
+##  Node      - A computer in the cluster (e.g. NODE020)
+##  Core      - This is essentially a CPU in a node
+##  Task      - A standard heavy-weight process (i.e. not a thread)
+##  Array Job - A job that runs multiple sub-jobs (e.g. for parameter sweeps)
+
+## General partitions: all-LoPri, all-HiPri, bigmem-LoPri, bigmem-HiPri, gpuq
+##    all-*     Will run jobs on (almost) any node available
+##    bigmem-*  Will run jobs only on nodes with 512GB memory
+##    *-HiPri   Will run jobs for up to 12 hours
+##    *-LoPri   Will run jobs for up to 5 days
+##    gpuq      Will run jobs only on nodes with GPUs (40, 50, 55, 56)
+## Restricted partitions: CDS_q, CS_q, STATS_q, HH_q, GA_q, ES_q, COS_q
+##                        Provide high priority access for contributors
+
+## Deal with output and errors.  Separate into 2 files (not the default).
+## May help to put your result files in a directory: e.g. /scratch/%u/logs/...
+## NOTE: %u=userID, %x=jobName, %N=nodeID, %j=jobID, %A=arrayID, %a=arrayTaskID
+
+## You can improve your scheduling priority by specifying upper limits on
+## needed resources, but jobs that exceed these values will be terminated.
+## Check your "Job Ended" emails for actual resource usage info as a guide.
+#SBATCH --mem=<X>M        # Total memory needed per task (units: K,M,G,T)
+#SBATCH --time=<D-HH:MM>  # Total time needed for job: Days-Hours:Minutes
+
+
+## ----- Parallel Jobs -----
+## Parallel jobs may involve running multiple heavy-weight processes on one
+## or more nodes, or multiple light-weight threads (always on the same node),
+## or some combination of these.  Make sure that the resources you request
+## are feasible, e.g. --cpus-per-task must be <= # of cores on a node.
+##SBATCH --cpus-per-task <C>   # Request extra CPUs for threads
+##SBATCH --ntasks <T>          # Number of processes you plan to launch
+##SBATCH --nodes <N>           # If you want some control over how tasks are
+                               #    distributed on nodes.  <T> >= <N>
+##SBATCH --ntasks-per-node <Z> # If you want more control over how tasks are
+                               #    distributed on nodes.  <T> = <N> * <Z>

@@ -1,0 +1,40 @@
+mkdir -p ~/libraries
+cd ~/libraries
+wget ftp://ftp.unidata.ucar.edu/pub/udunits/udunits-2.2.26.tar.gz
+tar xvfz udunits-2.2.26.tar.gz
+cd udunits-2.2.26
+./configure --prefix="$HOME/libraries"
+make
+make install
+cd $HOME
+
+## Now add this line to you $HOME/.bashrc file
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/libraries/lib
+export PATH=$PATH:$HOME/libraries/bin
+
+## Source your .bashrc and load the GDAL module
+. .bashrc
+module load GDAL/2.2.3
+module load R/3.5.1
+
+## Build the GEOS library from source.
+cd $HOME/libraries
+wget http://download.osgeo.org/geos/geos-3.7.1.tar.bz2
+tar xvfj geos-3.7.1.tar.bz2
+cd geos-3.7.1
+./configure --prefix="$HOME/libraries"
+make
+make install
+cd $HOME
+
+## Install the R 'units' library
+R
+install.packages('units',
+configure.args=c('--with-udunits2-lib=/home/hgallo/libraries/lib',
+'--with-udunits2-include=/home/hgallo/libraries/include'))
+
+## Install the R 'sf' library
+install.packages("sf", configure.args =c(
+"--with-proj-include=/cm/shared/apps/proj/4.9.3/include",
+"--with-proj-lib=/cm/shared/apps/proj/4.9.3/lib",
+"--with-proj-share=/cm/shared/apps/proj/4.9.3/share/proj"))

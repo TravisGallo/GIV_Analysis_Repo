@@ -1,0 +1,159 @@
+* installing *source* package ‘raster’ ...
+** package ‘raster’ successfully unpacked and MD5 sums checked
+** libs
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c RasterModule.cpp -o RasterModule.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c RcppExports.cpp -o RcppExports.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c aggregate.cpp -o aggregate.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c area.cpp -o area.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c bilinear.cpp -o bilinear.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c broom.c -o broom.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c cellRowCol.cpp -o cellRowCol.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c clamp.c -o clamp.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c distance.cpp -o distance.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c edge.c -o edge.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c focal_fun.c -o focal_fun.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c focal_get.c -o focal_get.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c focal_sum.c -o focal_sum.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c geodesic.c -o geodesic.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c getPolygons.cpp -o getPolygons.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c intersect.c -o intersect.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c layerize.c -o layerize.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c memory.cpp -o memory.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c modal.cpp -o modal.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c ppmin.cpp -o ppmin.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c r_terrain.c -o r_terrain.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c rasterize.cpp -o rasterize.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c rcpp_aggregate.cpp -o rcpp_aggregate.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c rcpp_distance.cpp -o rcpp_distance.o
+g++ -std=gnu++11 -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include   -fpic  -g -O2 -c rcpp_xyCell.cpp -o rcpp_xyCell.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c reclass.c -o reclass.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c util.c -o util.o
+gcc -I"/cm/shared/apps/R/3.5.1/lib64/R/include" -DNDEBUG  -I"/cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/include" -I/usr/local/include -fpic  -g -O2  -c wirth.c -o wirth.o
+g++ -std=gnu++11 -shared -L/cm/shared/apps/R/3.5.1/lib64/R/lib -L/usr/local/lib64 -o raster.so RasterModule.o RcppExports.o aggregate.o area.o bilinear.o broom.o cellRowCol.o clamp.o distance.o edge.o focal_fun.o focal_get.o focal_sum.o geodesic.o getPolygons.o intersect.olayerize.o memory.o modal.o ppmin.o r_terrain.o rasterize.o rcpp_aggregate.o rcpp_distance.o rcpp_xyCell.o reclass.o util.o wirth.o -L/cm/shared/apps/R/3.5.1/lib64/R/lib -lR
+installing to /home/hgallo/Rlibs/raster/libs
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+in method for ‘brick’ with signature ‘x="big.matrix"’: no definition for class “big.matrix”
+in method for ‘brick’ with signature ‘x="kasc"’: no definition for class “kasc”
+in method for ‘brick’ with signature ‘x="grf"’: no definition for class “grf”
+in method for ‘coerce’ with signature ‘"STFDF","RasterBrick"’: no definition for class “STFDF”
+in method for ‘coerce’ with signature ‘"STSDF","RasterBrick"’: no definition for class “STSDF”
+in method for ‘coerce’ with signature ‘"asc","RasterLayer"’: no definition for class “asc”
+in method for ‘coerce’ with signature ‘"RasterLayer","asc"’: no definition for class “asc”
+in method for ‘coerce’ with signature ‘"kasc","RasterBrick"’: no definition for class “kasc”
+in method for ‘coerce’ with signature ‘"kasc","RasterStack"’: no definition for class “kasc”
+in method for ‘coerce’ with signature ‘"kde","RasterLayer"’: no definition for class “kde”
+in method for ‘coerce’ with signature ‘"grf","RasterBrick"’: no definition for class “grf”
+in method for ‘coerce’ with signature ‘"grf","RasterLayer"’: no definition for class “grf”
+Creating a generic function for ‘ncol’ from package ‘base’ in package ‘raster’
+in method for ‘extent’ with signature ‘x="sf"’: no definition for class “sf”
+in method for ‘extract’ with signature ‘x="Raster",y="sf"’: no definition for class “sf”
+in method for ‘mask’ with signature ‘x="Raster",mask="sf"’: no definition for class “sf”
+in method for ‘raster’ with signature ‘x="big.matrix"’: no definition for class “big.matrix”
+in method for ‘raster’ with signature ‘x="sf"’: no definition for class “sf”
+in method for ‘raster’ with signature ‘x="kasc"’: no definition for class “kasc”
+in method for ‘raster’ with signature ‘x="asc"’: no definition for class “asc”
+in method for ‘raster’ with signature ‘x="kde"’: no definition for class “kde”
+in method for ‘raster’ with signature ‘x="grf"’: no definition for class “grf”
+in method for ‘rasterize’ with signature ‘x="sf",y="Raster"’: no definition for class “sf”
+Creating a generic function for ‘rowSums’ from package ‘base’ in package ‘raster’
+Creating a generic function for ‘colSums’ from package ‘base’ in package ‘raster’
+in method for ‘stack’ with signature ‘x="kasc"’: no definition for class “kasc”
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded
+*** Error in `/cm/shared/apps/R/3.5.1/lib64/R/bin/exec/R': free(): invalid pointer: 0x000000000323b548 ***
+======= Backtrace: =========
+/lib64/libc.so.6(+0x81489)[0x7f1addf4d489]
+/home/hgallo/Rlibs/raster/libs/raster.so(_Z23_rcpp_module_spmod_initv+0x2d8)[0x7f1aa9bbeac8]
+/home/hgallo/Rlibs/raster/libs/raster.so(_rcpp_module_boot_spmod+0x21)[0x7f1aa9bc0df1]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x130018)[0x7f1adea16018]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13c19f)[0x7f1adea2219f]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x132121)[0x7f1adea18121]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13af74)[0x7f1adea20f74]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13b3f8)[0x7f1adea213f8]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x12fb25)[0x7f1adea15b25]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13af74)[0x7f1adea20f74]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13b3f8)[0x7f1adea213f8]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x12fb25)[0x7f1adea15b25]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13af74)[0x7f1adea20f74]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13b3f8)[0x7f1adea213f8]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x12fb25)[0x7f1adea15b25]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13af74)[0x7f1adea20f74]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13b3f8)[0x7f1adea213f8]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x12fb25)[0x7f1adea15b25]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13c19f)[0x7f1adea2219f]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x132121)[0x7f1adea18121]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13c19f)[0x7f1adea2219f]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x132121)[0x7f1adea18121]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13c19f)[0x7f1adea2219f]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x132121)[0x7f1adea18121]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13c19f)[0x7f1adea2219f]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x132121)[0x7f1adea18121]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13c19f)[0x7f1adea2219f]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x132121)[0x7f1adea18121]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13c19f)[0x7f1adea2219f]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x33a)[0x7f1adea2083a]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13af74)[0x7f1adea20f74]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13b3f8)[0x7f1adea213f8]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x12fb25)[0x7f1adea15b25]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13af74)[0x7f1adea20f74]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13b3f8)[0x7f1adea213f8]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x12fb25)[0x7f1adea15b25]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13af74)[0x7f1adea20f74]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13b3f8)[0x7f1adea213f8]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x12fb25)[0x7f1adea15b25]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13af74)[0x7f1adea20f74]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13b3f8)[0x7f1adea213f8]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x12fb25)[0x7f1adea15b25]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13c19f)[0x7f1adea2219f]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x132121)[0x7f1adea18121]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x13c19f)[0x7f1adea2219f]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(+0x132121)[0x7f1adea18121]
+/cm/shared/apps/R/3.5.1/lib64/R/lib/libR.so(Rf_eval+0x170)[0x7f1adea20670]
+======= Memory map: ========
+00400000-00401000 r-xp 00000000 00:35 1046035006                         /cm/shared/apps/R/3.5.1/lib64/R/bin/exec/R
+00600000-00601000 r--p 00000000 00:35 1046035006                         /cm/shared/apps/R/3.5.1/lib64/R/bin/exec/R
+00601000-00602000 rw-p 00001000 00:35 1046035006                         /cm/shared/apps/R/3.5.1/lib64/R/bin/exec/R
+00fd5000-06c77000 rw-p 00000000 00:00 0                                  [heap]
+7f1aa4000000-7f1aa4021000 rw-p 00000000 00:00 0
+7f1aa4021000-7f1aa8000000 ---p 00000000 00:00 0
+7f1aa9931000-7f1aa9b9c000 rw-p 00000000 00:00 0
+7f1aa9b9c000-7f1aa9c18000 r-xp 00000000 00:33 223345621043               /home/hgallo/Rlibs/raster/libs/raster.so
+7f1aa9c18000-7f1aa9e18000 ---p 0007c000 00:33 223345621043               /home/hgallo/Rlibs/raster/libs/raster.so
+7f1aa9e18000-7f1aa9e1a000 r--p 0007c000 00:33 223345621043               /home/hgallo/Rlibs/raster/libs/raster.so
+7f1aa9e1a000-7f1aa9e1b000 rw-p 0007e000 00:33 223345621043               /home/hgallo/Rlibs/raster/libs/raster.so
+7f1aa9e1b000-7f1aa9e1d000 rw-p 00000000 00:00 0
+7f1aa9e1d000-7f1aa9e78000 r-xp 00000000 00:35 1070846764                 /cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/libs/Rcpp.so
+7f1aa9e78000-7f1aaa077000 ---p 0005b000 00:35 1070846764                 /cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/libs/Rcpp.so
+7f1aaa077000-7f1aaa079000 r--p 0005a000 00:35 1070846764                 /cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/libs/Rcpp.so
+7f1aaa079000-7f1aaa07b000 rw-p 0005c000 00:35 1070846764                 /cm/shared/apps/R/3.5.1/lib64/R/library/Rcpp/libs/Rcpp.so
+7f1aaa07b000-7f1aaa082000 rw-p 00000000 00:00 0
+7f1aaa082000-7f1aaa08a000 r-xp 00000000 00:33 17180219137                /home/hgallo/Rlibs/sp/libs/sp.so
+7f1aaa08a000-7f1aaa289000 ---p 00008000 00:33 17180219137                /home/hgallo/Rlibs/sp/libs/sp.so
+7f1aaa289000-7f1aaa28a000 r--p 00007000 00:33 17180219137                /home/hgallo/Rlibs/sp/libs/sp.so
+7f1aaa28a000-7f1aaa28b000 rw-p 00008000 00:33 17180219137                /home/hgallo/Rlibs/sp/libs/sp.so
+7f1aaa28b000-7f1aaa28e000 r-xp 00000000 00:35 356260134                  /cm/shared/apps/R/3.5.1/lib64/R/library/lattice/libs/lattice.so
+7f1aaa28e000-7f1aaa48d000 ---p 00003000 00:35 356260134                  /cm/shared/apps/R/3.5.1/lib64/R/library/lattice/libs/lattice.so
+7f1aaa48d000-7f1aaa48e000 r--p 00002000 00:35 356260134                  /cm/shared/apps/R/3.5.1/lib64/R/library/lattice/libs/lattice.sosh: line 1:  9550 Aborted                 '/cm/shared/apps/R/3.5.1/lib64/R/bin/R' --no-save --slave 2>&1 < '/tmp/Rtmp6AE0cd/file2238743cd880'
+ERROR: loading failed
+* removing ‘/home/hgallo/Rlibs/raster’
