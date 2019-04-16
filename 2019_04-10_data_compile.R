@@ -129,7 +129,7 @@ rm <- raster("./Data/GIS/2010_HRLC_cropped_compressed.tif")
 # create a list of patches so that you can work with the sf object using lapply
 patch_list <- split(patches, seq(nrow(patches)))
 
-cl <- makeCluster(detectCores()-2)
+cl <- makeCluster(detectCores()-6)
 clusterEvalQ(cl,library("sf"))
 clusterEvalQ(cl, library("raster"))
 clusterExport(cl, c("rm", "patch_list"))
@@ -163,7 +163,7 @@ colnames(patch_covs)[2] <- "patch_tree"
 
 
 # save since this takes a couple days
-write.csv(patch_covs, paste0("./Data/",Sys.Date(),"_patch_covs.csv"))
+write.csv(patch_covs, paste0("./Data/",Sys.Date(),"_raster_extract.csv"))
 
 
 ###########################################################
@@ -184,7 +184,7 @@ point_list <- split(points_buffered, seq(nrow(points_buffered)))
 # using 2010 data for our base model will match temporally with other site level covariates
 CMAP_pop <- st_read(dsn="./Data/GIS", layer="CMAP_2040_Forecast_26916")
 
-cl <- makeCluster(detectCores()-2)
+cl <- makeCluster(detectCores()-6)
 clusterEvalQ(cl,library("sf"))
 clusterExport(cl, c("CMAP_pop", "point_list"))
 
@@ -241,13 +241,13 @@ pop_future_log <- data.frame(pop_future_log)
 # Combine all the site-level data we created #
 ##############################################
 
-site_covs <- data.frame(patch_covs[,-1],
+site_covs <- data.frame(patch_covs,
                         POP10 = pop10_log,
                         pop_future_log)
 
 
 # look at correlation between variables
-C <- cor(site_covs[,c(2:4,4:5)])
+C <- cor(site_covs[,-1])
 corrplot.mixed(C)
 
 # scale all covariates
@@ -352,7 +352,7 @@ z_mat <- zmat[which(rownames(zmat) %in% sampled_sites),]
 yarray <- df_2_array(read.table("./Data/y_matrix_sp10_sp13_6_1_17.txt", 
                                header = TRUE, sep = "\t"))[,,-c(1,2)]
 # name the dimensions for book keeping
-dimnames(yarray) <- list(species_names[,1],full_site_names,seq(1,11,1))
+dimnames(yarray) <- list(species_names,full_site_names,seq(1,11,1))
 
 # isolate a single species to run model - here we use raccoon
 ymat <- yarray["Raccoon",,]
@@ -381,6 +381,7 @@ rowSums(y_mat, na.rm=TRUE) # Det per site
 
 
 data_list <- list(coords=coords,
+                  z_mat=z_mat,
                   y_mat=y_mat,
                   j_mat=j_mat,
                   sitecovs = site_covs,
@@ -398,7 +399,7 @@ source("GIV_utility_functions.R")
 # removoe unneeded functions
 rm(list = c("packs","df_2_array","extractLandcover","getIntersect","package_load"))
 # load data
-data <- readRDS("2019-04-09_DynOccu_Connectivity_DataList.rds")
+data <- readRDS("2019-04-15_DynOccu_Connectivity_DataList.rds")
 # save workspace to load into ARGO
 save.image(paste0(Sys.Date(),"_Connectivity_Workspace_ARGO.RData"))
 

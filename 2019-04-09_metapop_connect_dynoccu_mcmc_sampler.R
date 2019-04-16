@@ -14,7 +14,7 @@ library(data.table)
 library(Rfast)
 
 # load data
-load("2019-04-09_Connectivity_Workspace_ARGO.RData")
+load("2019-04-15_Connectivity_Workspace_ARGO.RData")
 
 ## front end cluster set up
 
@@ -22,7 +22,7 @@ load("2019-04-09_Connectivity_Workspace_ARGO.RData")
 # detect the number of CPU's avaliable - use this mpi function on cluster
 #no_cpu <- mpi.universe.size() - 1
 
-no_cpu <- detectCores() - 6
+no_cpu <- detectCores() - 2
 
 # set up cluster - use type = "MPI" on cluster
 #cl <- makeCluster(no_cpu, type = "MPI")
@@ -32,7 +32,7 @@ cl <- makeCluster(no_cpu)
 
 ## species specific settings
 # dispersal distance of species
-disp_dist <- 50000
+disp_dist <- 45000
 
 ## some early settings for inspection
 report <- 100 # report every x amount of iterations
@@ -41,19 +41,19 @@ plot.z <- TRUE # plot z with each report
 
 ## parameters for mcmc sample
 # mcmc iterations
-iters <- 3
+iters <- 100
 # parameters to monitor
 param_mon <- c("alpha[1]","alpha[2]", "sigma", 
                "b0.gam", "b.gam[1]", 
                "b0.psi1",
-               "b0.eps", "b.eps[1]", "b.eps[2]", "b.eps[3]", "b.eps[4]", "b.eps[5]",
+               "b0.eps", "b.eps[1]", "b.eps[2]", "b.eps[3]", "b.eps[4]",
                "a0", "season[2]","season[3]", "season[4]",
                "zk", "deviance")
 # tuning parameters
 tune <- c(0.3, 0.3, 0.3, # alpha coefficients and sigma
          0.3, 0.3, # gamma coefficients
          0.3, # psi1 coefficients
-         0.3, 0.3, 0.3, 0.3, 0.3, 0.3, # epsilon coefficients
+         0.3, 0.3, 0.3, 0.3, 0.3, # epsilon coefficients
          0.2, 0.2, 0.2, 0.2) #a0 and season parameters (detection)
 
 ## Dimensions
@@ -78,18 +78,18 @@ gamma0 <- as.vector(plogis(b0.gam + b.gam[1]*matrix(data$sitecovs[,"size_scaled"
 sigma <- runif(1,1,10)
 # extinction
 b0.eps <- rnorm(1, 0, 0.5) # intercept
-b.eps <- rnorm(5, 0, 0.5) # 5 covariates
+b.eps <- rnorm(4, 0, 0.5) # 5 covariates
 epsilon <- as.vector(plogis(b0.eps + b.eps[1]*matrix(data$sitecovs[ ,"tree_scaled"]) + 
-                              b.eps[2]*matrix(data$sitecovs[ ,"total_veg_scaled"]) + 
-                              b.eps[3]*matrix(data$sitecovs[ ,"size_scaled"]) + 
-                              b.eps[4]*matrix(data$sitecovs[ ,"POP10_scaled"]) +
-                              b.eps[5]*matrix(data$sitecovs[ ,"water_present"])))
+                              b.eps[2]*matrix(data$sitecovs[ ,"size_scaled"]) + 
+                              b.eps[3]*matrix(data$sitecovs[ ,"POP10_scaled"]) +
+                              b.eps[4]*matrix(data$sitecovs[ ,"water_present"])))
 # detection
 p <- rep(0, nseason)
 a0 <- rnorm(1, 0, 0.5)
+season_vec <- c(4,1,2,3,4,1,2,3,4,1,2)
 season <- rnorm(4,0 , 0.5)
 season[1] <- 0
-p <- plogis(a0 + season[c(4,1,2,3,4,1,2,3,4,1,2)])
+p <- plogis(a0 + season[season_vec])
 
 # need to run through the model to generate starting values for z[,k-1] based off z[,1] starting values,
 # psi, gamma, and likelihoods for z and y
@@ -259,7 +259,7 @@ for(s in 1:iters) {
       cat("z[k] =", zk, "\n")
       cat("accepted", round((zkup/nsite)*100, 1), "percent of z[k] proposals \n")
       cat("sum(ll.z) =", ll.z.sum, "\n")
-      cat("deviance =", round(samples[s-1,38], 2), "\n")
+      cat("deviance =", round(samples[s-1,ncol(samples)], 2), "\n")
       cat("time =", format(Sys.time()), "\n")
       if(plot.z) {
         library(lattice)
@@ -574,10 +574,9 @@ for(s in 1:iters) {
       b0.eps.cand <- rnorm(1, b0.eps, tune[7])
       epsilon.cand <- as.vector(plogis(b0.eps.cand + 
                                          matrix(b.eps[1]*data$sitecovs[,"tree_scaled"]) + 
-                                         matrix(b.eps[2]*data$sitecovs[,"total_veg_scaled"]) +
-                                         matrix(b.eps[3]*data$sitecovs[,"size_scaled"]) +
-                                         matrix(b.eps[4]*data$sitecovs[,"POP10_scaled"]) +
-                                         matrix( b.eps[5]*data$sitecovs[,"water_present"])))
+                                         matrix(b.eps[2]*data$sitecovs[,"size_scaled"]) +
+                                         matrix(b.eps[3]*data$sitecovs[,"POP10_scaled"]) +
+                                         matrix( b.eps[4]*data$sitecovs[,"water_present"])))
       psi.cand[,1] <- psi1
       ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
       for(k in 2:nseason) {
@@ -607,10 +606,9 @@ for(s in 1:iters) {
       b1.eps.cand <- rnorm(1, b.eps[1], tune[8])
       epsilon.cand <- as.vector(plogis(b0.eps + 
                                         matrix(b1.eps.cand*data$sitecovs[,"tree_scaled"]) +
-                                        matrix(b.eps[2]*data$sitecovs[,"total_veg_scaled"]) +
-                                        matrix(b.eps[3]*data$sitecovs[,"size_scaled"]) +
-                                        matrix(b.eps[4]*data$sitecovs[,"POP10_scaled"]) +
-                                        matrix(b.eps[5]*data$sitecovs[,"water_present"])))
+                                        matrix(b.eps[2]*data$sitecovs[,"size_scaled"]) +
+                                        matrix(b.eps[3]*data$sitecovs[,"POP10_scaled"]) +
+                                        matrix(b.eps[4]*data$sitecovs[,"water_present"])))
       psi.cand[,1] <- psi1
       ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
       for(k in 2:nseason) {
@@ -640,14 +638,13 @@ for(s in 1:iters) {
       b2.eps.cand <- rnorm(1, b.eps[2], tune[9])
       epsilon.cand <- as.vector(plogis(b0.eps + 
                                          matrix(b.eps[1]*data$sitecovs[,"tree_scaled"]) +
-                                         matrix(b2.eps.cand*data$sitecovs[,"total_veg_scaled"]) +
-                                         matrix(b.eps[3]*data$sitecovs[,"size_scaled"]) +
-                                         matrix(b.eps[4]*data$sitecovs[,"POP10_scaled"]) +
-                                         matrix(b.eps[5]*data$sitecovs[,"water_present"])))
+                                         matrix(b2.eps.cand*data$sitecovs[,"size_scaled"]) +
+                                         matrix(b.eps[3]*data$sitecovs[,"POP10_scaled"]) +
+                                         matrix(b.eps[4]*data$sitecovs[,"water_present"])))
       psi.cand[,1] <- psi1
       ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
       for(k in 2:nseason) {
-        psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) +
+        psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) + 
           (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
         ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
       }
@@ -673,14 +670,13 @@ for(s in 1:iters) {
       b3.eps.cand <- rnorm(1, b.eps[3], tune[10])
       epsilon.cand <- as.vector(plogis(b0.eps + 
                                          matrix(b.eps[1]*data$sitecovs[,"tree_scaled"]) +
-                                         matrix(b.eps[2]*data$sitecovs[,"total_veg_scaled"]) +
-                                         matrix(b3.eps.cand*data$sitecovs[,"size_scaled"]) +
-                                         matrix(b.eps[4]*data$sitecovs[,"POP10_scaled"]) +
-                                         matrix(b.eps[5]*data$sitecovs[,"water_present"])))
+                                         matrix(b.eps[2]*data$sitecovs[,"size_scaled"]) +
+                                         matrix(b3.eps.cand*data$sitecovs[,"POP10_scaled"]) +
+                                         matrix(b.eps[4]*data$sitecovs[,"water_present"])))
       psi.cand[,1] <- psi1
       ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
       for(k in 2:nseason) {
-        psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) + 
+        psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) +
           (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
         ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
       }
@@ -689,7 +685,7 @@ for(s in 1:iters) {
       prior.b3.eps <- dnorm(b.eps[3], 0, 2, log=TRUE)
       # update
       ll.z.sum.cand <- sum(ll.z.cand)
-      
+     
         if(runif(1) < exp((ll.z.sum.cand + prior.b3.eps.cand) -
                           (ll.z.sum + prior.b3.eps))) {
           b.eps[3] <- b3.eps.cand
@@ -706,10 +702,9 @@ for(s in 1:iters) {
       b4.eps.cand <- rnorm(1, b.eps[4], tune[11])
       epsilon.cand <- as.vector(plogis(b0.eps + 
                                          matrix(b.eps[1]*data$sitecovs[,"tree_scaled"]) +
-                                         matrix(b.eps[2]*data$sitecovs[,"total_veg_scaled"]) +
-                                         matrix(b.eps[3]*data$sitecovs[,"size_scaled"]) +
-                                         matrix(b4.eps.cand*data$sitecovs[,"POP10_scaled"]) +
-                                         matrix(b.eps[5]*data$sitecovs[,"water_present"])))
+                                         matrix(b.eps[2]*data$sitecovs[,"size_scaled"]) +
+                                         matrix(b.eps[3]*data$sitecovs[,"POP10_scaled"]) +
+                                         matrix(b4.eps.cand*data$sitecovs[,"water_present"])))
       psi.cand[,1] <- psi1
       ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
       for(k in 2:nseason) {
@@ -722,7 +717,7 @@ for(s in 1:iters) {
       prior.b4.eps <- dnorm(b.eps[4], 0, 2, log=TRUE)
       # update
       ll.z.sum.cand <- sum(ll.z.cand)
-     
+      
         if(runif(1) < exp((ll.z.sum.cand + prior.b4.eps.cand) -
                           (ll.z.sum + prior.b4.eps))) {
           b.eps[4] <- b4.eps.cand
@@ -734,41 +729,8 @@ for(s in 1:iters) {
       cat("b.eps4 - iteration",s,": time = ",format(Sys.time()), "\n")
     } # close sampler b.eps[4]
     
-  ## Metropolis update for b.eps[5] - part of the linear predictor for epsilon
-    if(sampling_order[subiter] == 12){
-      b5.eps.cand <- rnorm(1, b.eps[5], tune[12])
-      epsilon.cand <- as.vector(plogis(b0.eps + 
-                                         matrix(b.eps[1]*data$sitecovs[,"tree_scaled"]) +
-                                         matrix(b.eps[2]*data$sitecovs[,"total_veg_scaled"]) +
-                                         matrix(b.eps[3]*data$sitecovs[,"size_scaled"]) +
-                                         matrix(b.eps[4]*data$sitecovs[,"POP10_scaled"]) +
-                                         matrix(b5.eps.cand*data$sitecovs[,"water_present"])))
-      psi.cand[,1] <- psi1
-      ll.z.cand[,1] <- dbinom(z[,1], 1, psi.cand[,1], log=TRUE)
-      for(k in 2:nseason) {
-        psi.cand[,k] <- z[,k-1]*(1-epsilon.cand*(1-gamma[,k-1])) +
-          (1-z[,k-1])*gamma[,k-1] # w/ rescue effect
-        ll.z.cand[,k] <- dbinom(z[,k], 1, psi.cand[,k], log=TRUE)
-      }
-      # priors
-      prior.b5.eps.cand <- dnorm(b5.eps.cand, 0, 2, log=TRUE)
-      prior.b5.eps <- dnorm(b.eps[5], 0, 2, log=TRUE)
-      # update
-      ll.z.sum.cand <- sum(ll.z.cand)
-      
-        if(runif(1) < exp((ll.z.sum.cand + prior.b5.eps.cand) -
-                          (ll.z.sum + prior.b5.eps))) {
-          b.eps[5] <- b5.eps.cand
-          epsilon <- epsilon.cand
-          psi <- psi.cand
-          ll.z <- ll.z.cand
-          ll.z.sum <- ll.z.sum.cand
-        }
-      cat("b.eps5 - iteration",s,": time = ",format(Sys.time()), "\n")
-    } # close sampler b.eps[5]
-    
   ## Metropolis update for z
-    if(sampling_order[subiter] == 13){
+    if(sampling_order[subiter] == 12){
       zkup <- rep(0, nseason)
       zknown1 <- anyDetections[,1]==1
       zknown1[is.na(zknown1)] <- FALSE
@@ -825,9 +787,9 @@ for(s in 1:iters) {
     } # close sampler z
     
   ## Metropolis update for a0 - part of detection probability
-    if(sampling_order[subiter] == 14){
-      a0.cand<-rnorm(1, a0, tune[13])
-      p.cand <- plogis(a0.cand + season[data$season_vec])
+    if(sampling_order[subiter] == 13){
+      a0.cand<-rnorm(1, a0, tune[12])
+      p.cand <- plogis(a0.cand + season[season_vec])
       p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
       p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
   
@@ -851,10 +813,10 @@ for(s in 1:iters) {
     } # close sampler a0
     
   #Update for season 2
-    if(sampling_order[subiter] == 15){
+    if(sampling_order[subiter] == 14){
       season2.cand.vec <- season
-      season2.cand.vec[2] <- rnorm(1, season[2], tune[14])
-      p.cand <- plogis(a0 + season2.cand.vec[data$season_vec])
+      season2.cand.vec[2] <- rnorm(1, season[2], tune[13])
+      p.cand <- plogis(a0 + season2.cand.vec[season_vec])
       p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
       p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
       
@@ -878,10 +840,10 @@ for(s in 1:iters) {
     } # close sampler season2
   
   # Update for season 3
-    if(sampling_order[subiter] == 16){
+    if(sampling_order[subiter] == 15){
       season3.cand.vec <- season
-      season3.cand.vec[3] <- rnorm(1, season[3], tune[15])
-      p.cand <- plogis(a0 + season3.cand.vec[data$season_vec])
+      season3.cand.vec[3] <- rnorm(1, season[3], tune[14])
+      p.cand <- plogis(a0 + season3.cand.vec[season_vec])
       p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
       p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
       
@@ -905,10 +867,10 @@ for(s in 1:iters) {
     } # close sampler season3
   
   # Update for season 4
-    if(sampling_order[subiter] == 17){
+    if(sampling_order[subiter] == 16){
       season4.cand.vec <- season
-      season4.cand.vec[4] <- rnorm(1, season[4], tune[16])
-      p.cand <- plogis(a0 + season4.cand.vec[data$season_vec])
+      season4.cand.vec[4] <- rnorm(1, season[4], tune[15])
+      p.cand <- plogis(a0 + season4.cand.vec[season_vec])
       p.mat <- matrix(p, nsampled, nseason, byrow=TRUE)
       p.cand.mat <- matrix(p.cand, nsampled, nseason, byrow=TRUE)
       
