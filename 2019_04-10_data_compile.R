@@ -85,8 +85,8 @@ patches_combined$area <- as.numeric(st_area(patches_combined))/1e6
 # our smallest sampled patch will be the area cutoff
 min_area <- min(patches_combined$area[which(!is.na(patches_combined$Station.ID))])
 
-# remove M_patches smaller than our smallest sampled patch
-patches <- patches_combined[which(patches_combined$area >= min_area),]
+# remove patches smaller than 1 hectare
+patches <- patches_combined[which(patches_combined$area >=0.01),]
 
 # order patches so sampled sites are always first
 patches<- patches[order(patches$Station.ID),]
@@ -119,9 +119,13 @@ all_points <- all_points[order(all_points$Station.ID),]
 # get coordinates to use in model
 coords <- st_coordinates(all_points)
 
-###############################################################
+st_write(patches,".","2019-05-10_M_patches", driver = "ESRI Shapefile")
+st_write(sampled_points, "./Data","2019-05-10_sampled_points", driver = "ESRI Shapefile")
+#########################################################################
 # Calculate within patch covariates that describes each patch #
-###############################################################
+# This takes a long time on 6 cores #
+# Below is script to run on local machine, but we did this on a cluster #
+#########################################################################
 
 # calculate the proportion of each landcover variable within each patch
 rm <- raster("./Data/GIS/2010_HRLC_cropped_compressed.tif")
@@ -165,6 +169,11 @@ colnames(patch_covs)[2] <- "patch_tree"
 # save since this takes a couple days
 write.csv(patch_covs, paste0("./Data/",Sys.Date(),"_raster_extract.csv"))
 
+###########################################################
+# Read covariates file calculated on cluster 
+patch_covs <- readRDS("./Data/patch_covs_ARGO.rds")
+###########################################################
+
 
 ###########################################################
 # Calculate population density around the starting point #
@@ -201,7 +210,6 @@ stopCluster(cl)
 pop10_dens <- do.call(c, pop_extract)
 # take the log of 
 pop10_log <- as.vector(log(pop10_dens))
-
 
 
 # CMAP population data -  CMAP GoTo2050 - to get future projections
@@ -336,11 +344,26 @@ full_site_names <- gsub('0$', 1, full_site_names)
 species_names <- read.table("./Data/species_used_in_sp10_sp13_analysis.txt", header=TRUE,
                             stringsAsFactors = FALSE)[,1]
 
+#j-matrix (n days sampled)
+jmat <- as.matrix(read.table("./Data/j_matrix_sp10_sp13_6_1_17.txt", 
+                             header = TRUE, sep = "\t"))
+rownames(jmat) <- full_site_names
+# keep only the sites that we used for this analysis
+j_mat <- jmat[which(rownames(jmat) %in% sampled_sites),]
+
+# see which seasons had the most sampling
+colSums(j_mat)
+
+# to make computation feasible we will only use 8 seasons
+# SU11-SP13
+j_mat <- j_mat[,6:ncol(j_mat)]
+
 # load species specific data - remove sites that we do not use in this analysis
+# remove first 5 seasons
 zarray <- df_2_array(read.table("./Data/z_matrix_sp10_sp13_6_1_17.txt", header = TRUE, 
-                               sep = "\t"))[,,-c(1,2)]
+                               sep = "\t"))[,,-c(1,2,3,4,5)]
 # name the dimensions for book keeping
-dimnames(zarray) <- list(species_names,full_site_names,seq(1,11,1))
+dimnames(zarray) <- list(species_names,full_site_names,seq(1,8,1))
 
 # isolate a single species to run model - here we use raccoon
 zmat <- zarray["Raccoon",,]
@@ -350,22 +373,15 @@ z_mat <- zmat[which(rownames(zmat) %in% sampled_sites),]
 
 # build y-array (detection)
 yarray <- df_2_array(read.table("./Data/y_matrix_sp10_sp13_6_1_17.txt", 
-                               header = TRUE, sep = "\t"))[,,-c(1,2)]
+                               header = TRUE, sep = "\t"))[,,-c(1,2,3,4,5)]
 # name the dimensions for book keeping
-dimnames(yarray) <- list(species_names,full_site_names,seq(1,11,1))
+dimnames(yarray) <- list(species_names,full_site_names,seq(1,8,1))
 
 # isolate a single species to run model - here we use raccoon
 ymat <- yarray["Raccoon",,]
 
 # keep only the sites that we used for this analysis
 y_mat <- ymat[which(rownames(ymat) %in% sampled_sites),]
-
-#j-matrix (n days sampled)
-jmat <- as.matrix(read.table("./Data/j_matrix_sp10_sp13_6_1_17.txt", 
-                              header = TRUE, sep = "\t"))[,-c(1,2)]
-rownames(jmat) <- full_site_names
-# keep only the sites that we used for this analysis
-j_mat <- jmat[which(rownames(jmat) %in% sampled_sites),]
 
 
 # take a look at the raw data
@@ -399,7 +415,7 @@ source("GIV_utility_functions.R")
 # removoe unneeded functions
 rm(list = c("packs","df_2_array","extractLandcover","getIntersect","package_load"))
 # load data
-data <- readRDS("2019-04-15_DynOccu_Connectivity_DataList.rds")
+data <- readRDS("2019-05-10_DynOccu_Connectivity_DataList.rds")
 # save workspace to load into ARGO
 save.image(paste0(Sys.Date(),"_Connectivity_Workspace_ARGO.RData"))
 

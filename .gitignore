@@ -47,3 +47,7 @@ vignettes/*.pdf
 *.prj
 *.qpj
 *.shx
+.Rproj.user
+
+# Other Directories
+/ARGO_Scripts/

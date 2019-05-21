@@ -13,8 +13,18 @@
 ## Specifying an upper limit on needed resources will improve your scheduling
 ## priority, but if you exceed these values, your job will be terminated.
 ## Check your "Job Ended" emails for actual resource usage info.
-#SBATCH --mem=1G    # Total memory needed for your job (suffixes: K,M,G,T)
-#SBATCH --time=3-00:00  # Total time needed for your job: Days-Hours:Minutes
+#SBATCH --mem=3G    # Total memory needed for your job (suffixes: K,M,G,T)
+#SBATCH --time=5-00:00  # Total time needed for your job: Days-Hours:Minutes
+
+## General partitions: all-LoPri, all-HiPri, bigmem-LoPri, bigmem-HiPri, gpuq
+##    all-*     Will run jobs on (almost) any node available
+##    bigmem-*  Will run jobs only on nodes with 512GB memory
+##    *-HiPri   Will run jobs for up to 12 hours
+##    *-LoPri   Will run jobs for up to 5 days
+##    gpuq      Will run jobs only on nodes with GPUs (40, 50, 55, 56)
+## Restricted partitions: CDS_q, CS_q, STATS_q, HH_q, GA_q, ES_q, COS_q
+##                        Provide high priority access for contributors
+#SBATCH --partition=all-LoPri
 
 ## ----- Parallel Threads -----
 #SBATCH --cpus-per-task 24
@@ -24,11 +34,12 @@ module purge
 
 ## Load the relevant modules needed for the job
 module load R/3.5.1
+module load GDAL
 
 ## R wants to write files to our current directory, so make sure it's writable
-##ORIG_DIR=$PWD
-##cd /scratch/$USER
+ORIG_DIR=$PWD
+cd /scratch/$USER
 
 ## Start the job
-Rscript --no-restore --quiet --no-save 2019-03-25_raster_extract.R
+Rscript --no-restore --quiet --no-save $ORIG_DIR/raster_extract.R
 
