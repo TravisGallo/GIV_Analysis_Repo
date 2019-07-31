@@ -413,7 +413,8 @@ rm(list=ls())
 # load functions
 source("GIV_utility_functions.R")
 # removoe unneeded functions
-rm(list = c("packs","df_2_array","extractLandcover","getIntersect","package_load"))
+rm(list = c("packs","df_2_array","extractLandcover","getIntersect","package_load",
+            "getEdgeWeights"))
 # load data
 data <- readRDS("2019-05-10_DynOccu_Connectivity_DataList.rds")
 # save workspace to load into ARGO
